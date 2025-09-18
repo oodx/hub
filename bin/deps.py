@@ -1062,6 +1062,8 @@ class RepoData:
     parent: str
     last_update: int
     cargo_version: str
+    hub_usage: str  # "1.0.0" or "path" or "NONE"
+    hub_status: str  # "using", "path", "none"
 
 @dataclass
 class DepData:
@@ -1077,6 +1079,8 @@ class LatestData:
     pkg_id: int
     pkg_name: str
     latest_version: str
+    hub_version: str  # Hub's version or "NONE"
+    hub_status: str   # "current", "outdated", "gap", "none"
 
 @dataclass
 class VersionMapData:
@@ -1138,13 +1142,19 @@ def extract_repo_metadata_batch(cargo_files: List[Path]) -> List[RepoData]:
             # Get git timestamp (simplified for now)
             last_update = int(cargo_path.stat().st_mtime)
 
+            # Check for hub usage (placeholder for now)
+            hub_usage = "NONE"
+            hub_status = "none"
+
             repos.append(RepoData(
                 repo_id=repo_id,
                 repo_name=repo_name,
                 path=rel_path,
                 parent=parent_repo.split('.')[0],  # Just parent part
                 last_update=last_update,
-                cargo_version=cargo_version
+                cargo_version=cargo_version,
+                hub_usage=hub_usage,
+                hub_status=hub_status
             ))
             repo_id += 1
 
@@ -1253,10 +1263,16 @@ def batch_fetch_latest_versions(package_names: Set[str]) -> Dict[str, LatestData
 
             latest_version = get_latest_version(pkg_name)
             if latest_version:
+                # Placeholder hub info (will enhance later)
+                hub_version = "NONE"
+                hub_status = "gap"
+
                 latest_data[pkg_name] = LatestData(
                     pkg_id=pkg_id,
                     pkg_name=pkg_name,
-                    latest_version=latest_version
+                    latest_version=latest_version,
+                    hub_version=hub_version,
+                    hub_status=hub_status
                 )
                 pkg_id += 1
 
@@ -1575,7 +1591,8 @@ def generate_data_cache(dependencies):
     print(f"{Colors.CYAN}Phase 3: Extracting dependencies...{Colors.END}")
     deps = extract_dependencies_batch(cargo_files)
     unique_packages = collect_unique_packages(deps)
-    print(f"Found {len(deps)} dependency entries, {len(unique_packages)} unique packages")
+    hub_using_repos = len([r for r in repos if r.hub_status in ['using', 'path', 'workspace']])
+    print(f"Found {len(deps)} dependency entries, {len(unique_packages)} unique packages, {hub_using_repos} repos using hub")
 
     # Phase 4: Batch fetch latest versions
     print(f"{Colors.CYAN}Phase 4: Fetching latest versions...{Colors.END}")
