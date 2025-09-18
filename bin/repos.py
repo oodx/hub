@@ -2115,22 +2115,51 @@ def generate_data_cache(dependencies):
 
     print(f"\n{Colors.GREEN}{Colors.BOLD}✅ Data cache generated: {output_file}{Colors.END}")
 
+def discover_repositories(force_live=False):
+    """Discover repository paths using cache or live discovery
+
+    Args:
+        force_live: If True, force live discovery even if cache exists
+
+    Returns:
+        List[Path]: List of repository paths
+    """
+    if not force_live:
+        try:
+            ecosystem = hydrate_tsv_cache()
+            # repo.path includes Cargo.toml, so get parent directory
+            repo_paths = [(Path(RUST_REPO_ROOT) / repo.path).parent for repo in ecosystem.repos.values()]
+            print(f"{Colors.GREEN}📋 Found {len(repo_paths)} repositories from cache{Colors.END}")
+            return repo_paths
+        except FileNotFoundError:
+            print(f"{Colors.YELLOW}⚠️  Cache not found, discovering repositories...{Colors.END}")
+
+    # Live discovery
+    print(f"{Colors.CYAN}🔍 Live discovery: scanning filesystem...{Colors.END}")
+    cargo_files = find_all_cargo_files_fast()
+    repo_paths = [path.parent for path in cargo_files]
+    print(f"{Colors.GREEN}📋 Found {len(repo_paths)} repositories via live discovery{Colors.END}")
+    return repo_paths
+
+def list_repositories(force_live=False):
+    """List all repository names"""
+    print(f"{Colors.CYAN}{Colors.BOLD}📂 Repository List{Colors.END}")
+
+    repo_paths = discover_repositories(force_live)
+
+    if not repo_paths:
+        print(f"{Colors.RED}❌ No repositories found{Colors.END}")
+        return
+
+    print(f"\n{Colors.WHITE}Found {len(repo_paths)} repositories:{Colors.END}")
+    for i, repo_path in enumerate(sorted(repo_paths, key=lambda p: p.name), 1):
+        print(f"{Colors.BLUE}{i:2d}.{Colors.END} {Colors.BOLD}{repo_path.name}{Colors.END}")
+
 def superclean_targets():
     """Clean target directories across all ecosystem repositories"""
     print(f"{Colors.CYAN}{Colors.BOLD}🧹 SuperClean: Cleaning all target directories in ecosystem{Colors.END}")
 
-    # Use hydration to get repo list, or fall back to file discovery
-    try:
-        ecosystem = hydrate_tsv_cache()
-        # repo.path includes Cargo.toml, so get parent directory
-        repo_paths = [(Path(RUST_REPO_ROOT) / repo.path).parent for repo in ecosystem.repos.values()]
-        print(f"{Colors.GREEN}📋 Found {len(repo_paths)} repositories from cache{Colors.END}")
-    except FileNotFoundError:
-        print(f"{Colors.YELLOW}⚠️  Cache not found, discovering repositories...{Colors.END}")
-        # Fallback to finding Cargo.toml files
-        cargo_files = find_all_cargo_files()
-        repo_paths = [path.parent for path in cargo_files]
-        print(f"{Colors.GREEN}📋 Found {len(repo_paths)} repositories via discovery{Colors.END}")
+    repo_paths = discover_repositories()
 
     cleaned_count = 0
     total_size_freed = 0
@@ -2196,27 +2225,24 @@ def superclean_targets():
         else:
             print(f"   💾 Freed approximately {total_size_freed:.0f}MB of disk space")
 
-def tap_repositories(ssh_test_cmd=None):
-    """Tap repositories - check git status and auto-commit uncommitted changes
+def test_ssh_connection(ssh_profile=None):
+    """Test SSH connection with configurable profile
 
     Args:
-        ssh_test_cmd: Custom SSH test command. Defaults to 'ssh -T git@github.com'
-                     Use 'ssh -T git@qodeninja' or any other custom command
+        ssh_profile: SSH profile/host. Defaults to RUST_SSH_PROFILE env var or 'github.com'
+                    Use 'qodeninja' for your custom profile
+
+    Returns:
+        bool: True if SSH connection successful, False otherwise
     """
-    from datetime import datetime
+    # Configure SSH test command with environment variable fallback
+    if ssh_profile is None:
+        ssh_profile = os.environ.get('RUST_SSH_PROFILE', 'github.com')
 
-    print(f"{Colors.CYAN}{Colors.BOLD}🚰 Tap: Auto-committing across ecosystem repositories{Colors.END}")
+    ssh_test_cmd = ['ssh', '-T', f'git@{ssh_profile}']
+    expected_success_text = "successfully authenticated"
 
-    # Configure SSH test command
-    if ssh_test_cmd is None:
-        ssh_test_cmd = ['ssh', '-T', 'git@github.com']
-        expected_success_text = "successfully authenticated"
-    else:
-        # Parse custom SSH command
-        ssh_test_cmd = ssh_test_cmd.split() if isinstance(ssh_test_cmd, str) else ssh_test_cmd
-        expected_success_text = "successfully authenticated"  # Can be customized per command
-
-    # Test SSH connection first
+    # Test SSH connection
     print(f"{Colors.YELLOW}🔐 Testing SSH connection: {' '.join(ssh_test_cmd)}...{Colors.END}")
     try:
         result = subprocess.run(ssh_test_cmd,
@@ -2226,30 +2252,42 @@ def tap_repositories(ssh_test_cmd=None):
         output_text = (result.stdout + result.stderr).lower()
         if expected_success_text in output_text or result.returncode == 0:
             print(f"{Colors.GREEN}✅ SSH connection verified{Colors.END}")
+            return True
         else:
             print(f"{Colors.RED}❌ SSH connection failed. Please check your SSH key setup.{Colors.END}")
             print(f"   Test command: {' '.join(ssh_test_cmd)}")
             print(f"   Output: {result.stderr or result.stdout}")
-            return
+            return False
     except subprocess.TimeoutExpired:
         print(f"{Colors.RED}❌ SSH connection timeout{Colors.END}")
-        return
+        return False
     except Exception as e:
         print(f"{Colors.RED}❌ SSH test failed: {e}{Colors.END}")
-        return
+        return False
+
+def tap_repositories(ssh_profile=None):
+    """Tap repositories - commit changes always, push only if SSH test passes
+
+    Args:
+        ssh_profile: SSH profile/host. Defaults to 'github.com'
+                    Use 'qodeninja' for your custom profile
+    """
+    from datetime import datetime
+
+    print(f"{Colors.CYAN}{Colors.BOLD}🚰 Tap: Auto-committing across ecosystem repositories{Colors.END}")
+
+    # Test SSH connection to determine if we can push
+    ssh_ok = test_ssh_connection(ssh_profile)
+    if ssh_ok:
+        print(f"{Colors.GREEN}🔗 SSH verified - will commit and push changes{Colors.END}")
+    else:
+        print(f"{Colors.YELLOW}⚠️  SSH failed - will only commit changes (no push){Colors.END}")
 
     # Get repository list
-    try:
-        ecosystem = hydrate_tsv_cache()
-        repo_paths = [(Path(RUST_REPO_ROOT) / repo.path).parent for repo in ecosystem.repos.values()]
-        print(f"{Colors.GREEN}📋 Found {len(repo_paths)} repositories from cache{Colors.END}")
-    except FileNotFoundError:
-        print(f"{Colors.YELLOW}⚠️  Cache not found, discovering repositories...{Colors.END}")
-        cargo_files = find_all_cargo_files()
-        repo_paths = [path.parent for path in cargo_files]
-        print(f"{Colors.GREEN}📋 Found {len(repo_paths)} repositories via discovery{Colors.END}")
+    repo_paths = discover_repositories()
 
     committed_count = 0
+    pushed_count = 0
     skipped_count = 0
     error_count = 0
     current_date = datetime.now().strftime("%Y-%m-%d")
@@ -2298,6 +2336,17 @@ def tap_repositories(ssh_test_cmd=None):
 
                     if commit_result.returncode == 0:
                         committed_count += 1
+
+                        # If SSH is OK, also push the changes
+                        if ssh_ok:
+                            progress.update(i, f"Pushing changes in {repo_path.name}...")
+                            push_result = subprocess.run(['git', 'push'],
+                                                       cwd=str(repo_path),
+                                                       capture_output=True, text=True, timeout=60)
+
+                            if push_result.returncode == 0:
+                                pushed_count += 1
+                            # Don't count push failure as error - commit succeeded
                     else:
                         error_count += 1
                 else:
@@ -2318,6 +2367,12 @@ def tap_repositories(ssh_test_cmd=None):
     # Summary
     print(f"\n{Colors.GREEN}{Colors.BOLD}✅ Tap Complete!{Colors.END}")
     print(f"   📝 Committed changes in {committed_count} repositories")
+    if ssh_ok and pushed_count > 0:
+        print(f"   🚀 Pushed changes in {pushed_count} repositories")
+    elif ssh_ok and committed_count > 0:
+        print(f"   📤 SSH OK but no pushes needed")
+    elif not ssh_ok and committed_count > 0:
+        print(f"   🔒 Changes committed locally only (SSH failed)")
     print(f"   ⏭️  Skipped {skipped_count} repositories (no changes or not git repos)")
     if error_count > 0:
         print(f"   ❌ Errors in {error_count} repositories")
@@ -2345,10 +2400,11 @@ def main():
 
     parser = argparse.ArgumentParser(description="Rust dependency analyzer with enhanced commands")
     parser.add_argument('command', nargs='?', default='analyze',
-                       choices=['analyze', 'query', 'q', 'all', 'export', 'eco', 'review', 'pkg', 'latest', 'hub', 'data', 'superclean', 'tap'],
+                       choices=['analyze', 'query', 'q', 'all', 'export', 'eco', 'review', 'pkg', 'latest', 'hub', 'data', 'superclean', 'tap', 'ssh-test', 'ls'],
                        help='Command to run')
     parser.add_argument('package', nargs='?', help='Package name for pkg/latest commands')
-    parser.add_argument('--ssh-test', default=None, help='Custom SSH test command for tap (e.g., "ssh -T git@qodeninja")')
+    parser.add_argument('--ssh-profile', default=None, help='SSH profile/host for git operations (e.g., "qodeninja" for git@qodeninja)')
+    parser.add_argument('--live', action='store_true', help='Force live discovery instead of using cache')
 
     args = parser.parse_args()
 
@@ -2403,7 +2459,13 @@ def main():
             superclean_targets()
         elif args.command == 'tap':
             # Auto-commit uncommitted changes across repositories
-            tap_repositories(ssh_test_cmd=args.ssh_test)
+            tap_repositories(ssh_profile=args.ssh_profile)
+        elif args.command == 'ssh-test':
+            # Test SSH connection standalone
+            test_ssh_connection(ssh_profile=args.ssh_profile)
+        elif args.command == 'ls':
+            # List repositories
+            list_repositories(force_live=args.live)
         else:  # default 'analyze', 'query', 'q'
             # Show package usage analysis
             analyze_package_usage(dependencies)
