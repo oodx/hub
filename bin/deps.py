@@ -26,6 +26,8 @@ from packaging import version
 import subprocess
 import urllib.request
 import urllib.error
+from dataclasses import dataclass
+from typing import List, Dict, Set, Optional, Tuple
 
 # Get RUST_REPO_ROOT environment variable or auto-detect
 RUST_REPO_ROOT = os.environ.get('RUST_REPO_ROOT')
@@ -1051,6 +1053,312 @@ def print_summary_table(high_usage=None, medium_usage=None, low_usage=None, pack
 
         print()
 
+# Data structures for structured cache
+@dataclass
+class RepoData:
+    repo_id: int
+    repo_name: str
+    path: str
+    parent: str
+    last_update: int
+    cargo_version: str
+
+@dataclass
+class DepData:
+    dep_id: int
+    repo_id: int
+    pkg_name: str
+    pkg_version: str
+    dep_type: str
+    features: str
+
+@dataclass
+class LatestData:
+    pkg_id: int
+    pkg_name: str
+    latest_version: str
+
+@dataclass
+class VersionMapData:
+    map_id: int
+    dep_id: int
+    pkg_id: int
+    repo_id: int
+    version_state: str
+    breaking_type: str
+    ecosystem_status: str
+
+# Helper functions for data cache generation
+def find_all_cargo_files_fast() -> List[Path]:
+    """Fast discovery of all Cargo.toml files using find command"""
+    if not RUST_REPO_ROOT:
+        return []
+
+    try:
+        # Use find command for speed, exclude target directories
+        cmd = [
+            'find', RUST_REPO_ROOT,
+            '-name', 'Cargo.toml',
+            '-not', '-path', '*/target/*',
+            '-not', '-path', '*/ref/*',
+            '-not', '-path', '*/howto/*',
+            '-not', '-path', '*/_arch/*',
+            '-not', '-path', '*/archive/*'
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode == 0:
+            paths = [Path(line.strip()) for line in result.stdout.strip().split('\n') if line.strip()]
+            return paths
+        else:
+            print(f"{Colors.YELLOW}⚠️  find command failed, falling back to Python search{Colors.END}")
+            return find_cargo_files(RUST_REPO_ROOT)
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        print(f"{Colors.YELLOW}⚠️  find command not available, using Python search{Colors.END}")
+        return find_cargo_files(RUST_REPO_ROOT)
+
+def extract_repo_metadata_batch(cargo_files: List[Path]) -> List[RepoData]:
+    """Extract repository metadata from all Cargo.toml files"""
+    repos = []
+    repo_id = 100
+
+    for cargo_path in cargo_files:
+        try:
+            with open(cargo_path, 'r') as f:
+                cargo_data = toml.load(f)
+
+            # Get basic repo info
+            package_info = cargo_data.get('package', {})
+            repo_name = package_info.get('name', cargo_path.parent.name)
+            cargo_version = package_info.get('version', '0.0.0')
+
+            # Get parent and relative path
+            rel_path = get_relative_path(cargo_path)
+            parent_repo = get_parent_repo(cargo_path)
+
+            # Get git timestamp (simplified for now)
+            last_update = int(cargo_path.stat().st_mtime)
+
+            repos.append(RepoData(
+                repo_id=repo_id,
+                repo_name=repo_name,
+                path=rel_path,
+                parent=parent_repo.split('.')[0],  # Just parent part
+                last_update=last_update,
+                cargo_version=cargo_version
+            ))
+            repo_id += 1
+
+        except Exception as e:
+            print(f"{Colors.YELLOW}⚠️  Warning: Could not parse {cargo_path}: {e}{Colors.END}")
+
+    return repos
+
+def extract_dependencies_batch(cargo_files: List[Path]) -> List[DepData]:
+    """Extract all dependencies from all Cargo.toml files"""
+    deps = []
+    dep_id = 1000
+
+    # Create repo_id lookup
+    repo_lookup = {}
+    repo_id = 100
+    for cargo_path in cargo_files:
+        repo_lookup[str(cargo_path)] = repo_id
+        repo_id += 1
+
+    for cargo_path in cargo_files:
+        try:
+            with open(cargo_path, 'r') as f:
+                cargo_data = toml.load(f)
+
+            current_repo_id = repo_lookup[str(cargo_path)]
+
+            # Process regular dependencies
+            if 'dependencies' in cargo_data:
+                for dep_name, dep_info in cargo_data['dependencies'].items():
+                    dep_version, features = parse_dependency_info(dep_info)
+                    if dep_version:  # Include all deps, even path/workspace
+                        deps.append(DepData(
+                            dep_id=dep_id,
+                            repo_id=current_repo_id,
+                            pkg_name=dep_name,
+                            pkg_version=dep_version,
+                            dep_type='dep',
+                            features=features
+                        ))
+                        dep_id += 1
+
+            # Process dev-dependencies
+            if 'dev-dependencies' in cargo_data:
+                for dep_name, dep_info in cargo_data['dev-dependencies'].items():
+                    dep_version, features = parse_dependency_info(dep_info)
+                    if dep_version:
+                        deps.append(DepData(
+                            dep_id=dep_id,
+                            repo_id=current_repo_id,
+                            pkg_name=dep_name,
+                            pkg_version=dep_version,
+                            dep_type='dev-dep',
+                            features=features
+                        ))
+                        dep_id += 1
+
+        except Exception as e:
+            print(f"{Colors.YELLOW}⚠️  Warning: Could not parse dependencies in {cargo_path}: {e}{Colors.END}")
+
+    return deps
+
+def parse_dependency_info(dep_info) -> Tuple[Optional[str], str]:
+    """Parse dependency info and return (version, features)"""
+    if isinstance(dep_info, str):
+        return dep_info, "NONE"
+    elif isinstance(dep_info, dict):
+        if 'version' in dep_info:
+            features = ','.join(dep_info.get('features', [])) or "NONE"
+            return dep_info['version'], features
+        elif 'path' in dep_info:
+            features = ','.join(dep_info.get('features', [])) or "NONE"
+            return f"path:{dep_info['path']}", features
+        elif 'workspace' in dep_info and dep_info['workspace']:
+            features = ','.join(dep_info.get('features', [])) or "NONE"
+            return "workspace:true", features
+        elif 'git' in dep_info:
+            features = ','.join(dep_info.get('features', [])) or "NONE"
+            git_ref = dep_info.get('rev', dep_info.get('branch', dep_info.get('tag', 'HEAD')))
+            return f"git:{dep_info['git']}#{git_ref}", features
+    return None, "NONE"
+
+def collect_unique_packages(deps: List[DepData]) -> Set[str]:
+    """Collect unique package names that need latest version lookup"""
+    packages = set()
+    for dep in deps:
+        # Only collect crates.io packages (not path/git/workspace)
+        if not dep.pkg_version.startswith(('path:', 'git:', 'workspace:')):
+            packages.add(dep.pkg_name)
+    return packages
+
+def batch_fetch_latest_versions(package_names: Set[str]) -> Dict[str, LatestData]:
+    """Batch fetch latest versions for all packages"""
+    latest_data = {}
+    pkg_id = 200
+
+    total = len(package_names)
+    progress = ProgressSpinner(f"Fetching latest versions...", total)
+    progress.start()
+
+    try:
+        processed = 0
+        for pkg_name in sorted(package_names):
+            processed += 1
+            progress.update(processed, f"Fetching {pkg_name}...")
+
+            latest_version = get_latest_version(pkg_name)
+            if latest_version:
+                latest_data[pkg_name] = LatestData(
+                    pkg_id=pkg_id,
+                    pkg_name=pkg_name,
+                    latest_version=latest_version
+                )
+                pkg_id += 1
+
+        progress.stop(f"{Colors.GREEN}✅ Fetched {len(latest_data)} latest versions{Colors.END}")
+
+    except Exception as e:
+        progress.stop(f"{Colors.RED}❌ Failed to fetch versions: {e}{Colors.END}")
+
+    return latest_data
+
+def generate_version_analysis(deps: List[DepData], repos: List[RepoData], latest_versions: Dict[str, LatestData]) -> List[VersionMapData]:
+    """Generate version analysis mapping"""
+    version_maps = []
+    map_id = 300
+
+    for dep in deps:
+        # Find corresponding repo and latest version data
+        repo = next((r for r in repos if r.repo_id == dep.repo_id), None)
+        latest = latest_versions.get(dep.pkg_name)
+
+        if repo and latest:
+            # Determine version state
+            version_state = get_version_stability(dep.pkg_version)
+
+            # Determine breaking type
+            breaking_type = "unknown"
+            if not dep.pkg_version.startswith(('path:', 'git:', 'workspace:')):
+                breaking_type = determine_breaking_type(dep.pkg_version, latest.latest_version)
+
+            # Determine ecosystem status (simplified for now)
+            ecosystem_status = "normal"
+
+            version_maps.append(VersionMapData(
+                map_id=map_id,
+                dep_id=dep.dep_id,
+                pkg_id=latest.pkg_id,
+                repo_id=dep.repo_id,
+                version_state=version_state,
+                breaking_type=breaking_type,
+                ecosystem_status=ecosystem_status
+            ))
+            map_id += 1
+
+    return version_maps
+
+def determine_breaking_type(current_version: str, latest_version: str) -> str:
+    """Determine if update would be breaking"""
+    if is_breaking_change(current_version, latest_version):
+        return "BREAKING"
+    elif parse_version(latest_version) and parse_version(current_version):
+        if parse_version(latest_version) > parse_version(current_version):
+            return "safe"
+        else:
+            return "current"
+    return "unknown"
+
+def get_version_stability(version_str: str) -> str:
+    """Get version stability status"""
+    if version_str.startswith(('path:', 'git:', 'workspace:')):
+        return "local"
+
+    parsed = parse_version(version_str)
+    if not parsed:
+        return "unknown"
+
+    if parsed.is_prerelease:
+        return "pre-release"
+    elif parsed.major == 0:
+        return "unstable"
+    else:
+        return "stable"
+
+def write_tsv_cache(repos: List[RepoData], deps: List[DepData], latest_versions: Dict[str, LatestData], version_maps: List[VersionMapData], output_file: str):
+    """Write structured TSV cache file"""
+    with open(output_file, 'w') as f:
+        # Section 1: REPO LIST
+        f.write("#------ SECTION : REPO LIST --------#\n")
+        f.write("REPO_ID\tREPO_NAME\tPATH\tPARENT\tLAST_UPDATE\tCARGO_VERSION\n")
+        for repo in repos:
+            f.write(f"{repo.repo_id}\t{repo.repo_name}\t{repo.path}\t{repo.parent}\t{repo.last_update}\t{repo.cargo_version}\n")
+        f.write("\n")
+
+        # Section 2: DEPS VERSIONS LIST
+        f.write("#------ SECTION : DEP VERSIONS LIST --------#\n")
+        f.write("DEP_ID\tREPO_ID\tPKG_NAME\tPKG_VERSION\tDEP_TYPE\tFEATURES\n")
+        for dep in deps:
+            f.write(f"{dep.dep_id}\t{dep.repo_id}\t{dep.pkg_name}\t{dep.pkg_version}\t{dep.dep_type}\t{dep.features}\n")
+        f.write("\n")
+
+        # Section 3: LATEST LIST
+        f.write("#------ SECTION : DEP LATEST LIST --------#\n")
+        f.write("PKG_ID\tPKG_NAME\tLATEST_VERSION\n")
+        for latest in latest_versions.values():
+            f.write(f"{latest.pkg_id}\t{latest.pkg_name}\t{latest.latest_version}\n")
+        f.write("\n")
+
+        # Section 4: VERSION MAP LIST
+        f.write("#------ SECTION : VERSION MAP LIST --------#\n")
+        f.write("MAP_ID\tDEP_ID\tPKG_ID\tREPO_ID\tVERSION_STATE\tBREAKING_TYPE\tECOSYSTEM_STATUS\n")
+        for vm in version_maps:
+            f.write(f"{vm.map_id}\t{vm.dep_id}\t{vm.pkg_id}\t{vm.repo_id}\t{vm.version_state}\t{vm.breaking_type}\t{vm.ecosystem_status}\n")
+
 def get_hub_dependencies():
     """Get dependencies from hub's Cargo.toml"""
     hub_deps = {}
@@ -1248,6 +1556,44 @@ def analyze_package_usage(dependencies):
         row += colored + padding
     print(row)
 
+def generate_data_cache(dependencies):
+    """Generate structured TSV data cache for fast view rendering"""
+    print(f"{Colors.PURPLE}{Colors.BOLD}📊 GENERATING STRUCTURED DATA CACHE{Colors.END}")
+    print(f"{Colors.PURPLE}{'='*80}{Colors.END}\n")
+
+    # Phase 1: Discovery
+    print(f"{Colors.CYAN}Phase 1: Discovering Cargo.toml files...{Colors.END}")
+    cargo_files = find_all_cargo_files_fast()
+    print(f"Found {len(cargo_files)} Cargo.toml files")
+
+    # Phase 2: Extract repo metadata
+    print(f"{Colors.CYAN}Phase 2: Extracting repository metadata...{Colors.END}")
+    repos = extract_repo_metadata_batch(cargo_files)
+    print(f"Processed {len(repos)} repositories")
+
+    # Phase 3: Extract dependencies
+    print(f"{Colors.CYAN}Phase 3: Extracting dependencies...{Colors.END}")
+    deps = extract_dependencies_batch(cargo_files)
+    unique_packages = collect_unique_packages(deps)
+    print(f"Found {len(deps)} dependency entries, {len(unique_packages)} unique packages")
+
+    # Phase 4: Batch fetch latest versions
+    print(f"{Colors.CYAN}Phase 4: Fetching latest versions...{Colors.END}")
+    latest_versions = batch_fetch_latest_versions(unique_packages)
+    print(f"Fetched latest versions for {len(latest_versions)} packages")
+
+    # Phase 5: Generate analysis data
+    print(f"{Colors.CYAN}Phase 5: Analyzing version status...{Colors.END}")
+    version_maps = generate_version_analysis(deps, repos, latest_versions)
+    print(f"Generated {len(version_maps)} version analysis entries")
+
+    # Phase 6: Write TSV cache
+    output_file = "deps_cache.tsv"
+    print(f"{Colors.CYAN}Phase 6: Writing cache to {output_file}...{Colors.END}")
+    write_tsv_cache(repos, deps, latest_versions, version_maps, output_file)
+
+    print(f"\n{Colors.GREEN}{Colors.BOLD}✅ Data cache generated: {output_file}{Colors.END}")
+
 def main():
     def signal_handler(signum, frame):
         """Global signal handler for graceful exit"""
@@ -1271,7 +1617,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Rust dependency analyzer with enhanced commands")
     parser.add_argument('command', nargs='?', default='analyze',
-                       choices=['analyze', 'query', 'q', 'all', 'export', 'eco', 'review', 'pkg', 'latest', 'hub'],
+                       choices=['analyze', 'query', 'q', 'all', 'export', 'eco', 'review', 'pkg', 'latest', 'hub', 'data'],
                        help='Command to run')
     parser.add_argument('package', nargs='?', help='Package name for pkg/latest commands')
 
@@ -1307,6 +1653,9 @@ def main():
         elif args.command == 'hub':
             # Show hub package status
             analyze_hub_status(dependencies)
+        elif args.command == 'data':
+            # Generate structured data cache
+            generate_data_cache(dependencies)
         else:  # default 'analyze', 'query', 'q'
             # Show package usage analysis
             analyze_package_usage(dependencies)
