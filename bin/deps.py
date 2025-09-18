@@ -1079,6 +1079,8 @@ class LatestData:
     pkg_id: int
     pkg_name: str
     latest_version: str
+    source_type: str  # "crate", "local", "git", "workspace"
+    source_value: str  # crates.io version, local path, git repo, or "WORKSPACE"
     hub_version: str  # Hub's version or "NONE"
     hub_status: str   # "current", "outdated", "gap", "none"
 
@@ -1091,6 +1093,14 @@ class VersionMapData:
     version_state: str
     breaking_type: str
     ecosystem_status: str
+
+@dataclass
+class HubInfo:
+    """Hub repository information container"""
+    path: str
+    version: str
+    dependencies: Dict[str, str]  # pkg_name -> version
+    last_update: int
 
 # Helper functions for data cache generation
 def find_all_cargo_files_fast() -> List[Path]:
@@ -1120,46 +1130,129 @@ def find_all_cargo_files_fast() -> List[Path]:
         print(f"{Colors.YELLOW}⚠️  find command not available, using Python search{Colors.END}")
         return find_cargo_files(RUST_REPO_ROOT)
 
-def extract_repo_metadata_batch(cargo_files: List[Path]) -> List[RepoData]:
-    """Extract repository metadata from all Cargo.toml files"""
+def get_repo_info(cargo_path: Path) -> Optional[Dict]:
+    """Get repository information from Cargo.toml file"""
+    try:
+        with open(cargo_path, 'r') as f:
+            cargo_data = toml.load(f)
+
+        # Get basic package info
+        package_info = cargo_data.get('package', {})
+        repo_name = package_info.get('name', cargo_path.parent.name)
+        version = package_info.get('version', '0.0.0')
+
+        # Extract dependencies
+        dependencies = {}
+        deps_section = cargo_data.get('dependencies', {})
+        for dep_name, dep_info in deps_section.items():
+            if isinstance(dep_info, str):
+                dependencies[dep_name] = dep_info
+            elif isinstance(dep_info, dict) and 'version' in dep_info:
+                dependencies[dep_name] = dep_info['version']
+
+        # Get last update time
+        last_update = int(cargo_path.stat().st_mtime)
+
+        # Get relative path
+        rel_path = get_relative_path(cargo_path)
+
+        return {
+            'cargo_path': cargo_path,
+            'repo_name': repo_name,
+            'version': version,
+            'dependencies': dependencies,
+            'last_update': last_update,
+            'rel_path': rel_path
+        }
+    except Exception as e:
+        print(f"{Colors.YELLOW}⚠️  Could not load repo info from {cargo_path}: {e}{Colors.END}")
+        return None
+
+def get_hub_info() -> Optional[HubInfo]:
+    """Get hub repository information using the general repo helper"""
+    if not RUST_REPO_ROOT:
+        return None
+
+    # Look for hub directory in common locations
+    hub_paths = [
+        Path(RUST_REPO_ROOT) / "oodx" / "projects" / "hub",
+        Path(RUST_REPO_ROOT) / "oodx" / "hub",
+        Path(RUST_REPO_ROOT) / "hub"
+    ]
+
+    for hub_path in hub_paths:
+        cargo_path = hub_path / "Cargo.toml"
+        if cargo_path.exists():
+            repo_info = get_repo_info(cargo_path)
+            if repo_info:
+                return HubInfo(
+                    path=repo_info['rel_path'],
+                    version=repo_info['version'],
+                    dependencies=repo_info['dependencies'],
+                    last_update=repo_info['last_update']
+                )
+
+    return None
+
+def detect_hub_usage(cargo_path: Path, hub_info: Optional[HubInfo]) -> Tuple[str, str]:
+    """Detect if a repo uses hub and return (usage, status)"""
+    if not hub_info:
+        return "NONE", "none"
+
+    try:
+        with open(cargo_path, 'r') as f:
+            cargo_data = toml.load(f)
+
+        deps_section = cargo_data.get('dependencies', {})
+
+        # Check for hub dependency
+        if 'hub' in deps_section:
+            hub_dep = deps_section['hub']
+            if isinstance(hub_dep, str):
+                return hub_dep, "using"
+            elif isinstance(hub_dep, dict):
+                if 'path' in hub_dep:
+                    return "path", "path"
+                elif 'version' in hub_dep:
+                    return hub_dep['version'], "using"
+                elif 'workspace' in hub_dep and hub_dep['workspace']:
+                    return "workspace", "workspace"
+
+        return "NONE", "none"
+    except Exception:
+        return "NONE", "none"
+
+def extract_repo_metadata_batch(cargo_files: List[Path], hub_info: Optional[HubInfo]) -> List[RepoData]:
+    """Extract repository metadata from all Cargo.toml files, excluding hub itself"""
     repos = []
     repo_id = 100
 
     for cargo_path in cargo_files:
-        try:
-            with open(cargo_path, 'r') as f:
-                cargo_data = toml.load(f)
+        repo_info = get_repo_info(cargo_path)
+        if not repo_info:
+            continue
 
-            # Get basic repo info
-            package_info = cargo_data.get('package', {})
-            repo_name = package_info.get('name', cargo_path.parent.name)
-            cargo_version = package_info.get('version', '0.0.0')
+        # Skip hub itself (don't count hub when walking repos)
+        if hub_info and repo_info['repo_name'] == 'hub':
+            continue
 
-            # Get parent and relative path
-            rel_path = get_relative_path(cargo_path)
-            parent_repo = get_parent_repo(cargo_path)
+        # Get parent repo info
+        parent_repo = get_parent_repo(cargo_path)
 
-            # Get git timestamp (simplified for now)
-            last_update = int(cargo_path.stat().st_mtime)
+        # Detect hub usage
+        hub_usage, hub_status = detect_hub_usage(cargo_path, hub_info)
 
-            # Check for hub usage (placeholder for now)
-            hub_usage = "NONE"
-            hub_status = "none"
-
-            repos.append(RepoData(
-                repo_id=repo_id,
-                repo_name=repo_name,
-                path=rel_path,
-                parent=parent_repo.split('.')[0],  # Just parent part
-                last_update=last_update,
-                cargo_version=cargo_version,
-                hub_usage=hub_usage,
-                hub_status=hub_status
-            ))
-            repo_id += 1
-
-        except Exception as e:
-            print(f"{Colors.YELLOW}⚠️  Warning: Could not parse {cargo_path}: {e}{Colors.END}")
+        repos.append(RepoData(
+            repo_id=repo_id,
+            repo_name=repo_info['repo_name'],
+            path=repo_info['rel_path'],
+            parent=parent_repo.split('.')[0],  # Just parent part
+            last_update=repo_info['last_update'],
+            cargo_version=repo_info['version'],
+            hub_usage=hub_usage,
+            hub_status=hub_status
+        ))
+        repo_id += 1
 
     return repos
 
@@ -1185,7 +1278,7 @@ def extract_dependencies_batch(cargo_files: List[Path]) -> List[DepData]:
             # Process regular dependencies
             if 'dependencies' in cargo_data:
                 for dep_name, dep_info in cargo_data['dependencies'].items():
-                    dep_version, features = parse_dependency_info(dep_info)
+                    dep_version, features, source_type, source_value = parse_dependency_info(dep_info, cargo_path)
                     if dep_version:  # Include all deps, even path/workspace
                         deps.append(DepData(
                             dep_id=dep_id,
@@ -1200,7 +1293,7 @@ def extract_dependencies_batch(cargo_files: List[Path]) -> List[DepData]:
             # Process dev-dependencies
             if 'dev-dependencies' in cargo_data:
                 for dep_name, dep_info in cargo_data['dev-dependencies'].items():
-                    dep_version, features = parse_dependency_info(dep_info)
+                    dep_version, features, source_type, source_value = parse_dependency_info(dep_info, cargo_path)
                     if dep_version:
                         deps.append(DepData(
                             dep_id=dep_id,
@@ -1217,60 +1310,216 @@ def extract_dependencies_batch(cargo_files: List[Path]) -> List[DepData]:
 
     return deps
 
-def parse_dependency_info(dep_info) -> Tuple[Optional[str], str]:
-    """Parse dependency info and return (version, features)"""
+def parse_dependency_info(dep_info, cargo_path: Path) -> Tuple[Optional[str], str, str, str]:
+    """Parse dependency info and return (version, features, source_type, source_value)"""
     if isinstance(dep_info, str):
-        return dep_info, "NONE"
+        # Simple version string: serde = "1.0"
+        return dep_info, "NONE", "crate", dep_info
     elif isinstance(dep_info, dict):
-        if 'version' in dep_info:
-            features = ','.join(dep_info.get('features', [])) or "NONE"
-            return dep_info['version'], features
-        elif 'path' in dep_info:
-            features = ','.join(dep_info.get('features', [])) or "NONE"
-            return f"path:{dep_info['path']}", features
-        elif 'workspace' in dep_info and dep_info['workspace']:
-            features = ','.join(dep_info.get('features', [])) or "NONE"
-            return "workspace:true", features
-        elif 'git' in dep_info:
-            features = ','.join(dep_info.get('features', [])) or "NONE"
-            git_ref = dep_info.get('rev', dep_info.get('branch', dep_info.get('tag', 'HEAD')))
-            return f"git:{dep_info['git']}#{git_ref}", features
-    return None, "NONE"
+        features = ','.join(dep_info.get('features', [])) or "NONE"
 
-def collect_unique_packages(deps: List[DepData]) -> Set[str]:
-    """Collect unique package names that need latest version lookup"""
-    packages = set()
-    for dep in deps:
-        # Only collect crates.io packages (not path/git/workspace)
-        if not dep.pkg_version.startswith(('path:', 'git:', 'workspace:')):
-            packages.add(dep.pkg_name)
+        if 'version' in dep_info:
+            # Standard crate: serde = { version = "1.0", features = [...] }
+            return dep_info['version'], features, "crate", dep_info['version']
+        elif 'path' in dep_info:
+            # Local path dependency: my-lib = { path = "../my-lib" }
+            path_value = dep_info['path']
+            local_version = resolve_local_version(cargo_path, path_value)
+            return local_version, features, "local", path_value
+        elif 'workspace' in dep_info and dep_info['workspace']:
+            # Workspace dependency: serde = { workspace = true }
+            workspace_version = resolve_workspace_version(cargo_path, dep_info)
+            return workspace_version, features, "workspace", "WORKSPACE"
+        elif 'git' in dep_info:
+            # Git dependency: some-crate = { git = "https://..." }
+            git_repo = dep_info['git']
+            git_ref = dep_info.get('rev', dep_info.get('branch', dep_info.get('tag', 'HEAD')))
+            git_version = resolve_git_version(git_repo, git_ref)
+            return git_version, features, "git", f"{git_repo}#{git_ref}"
+    return None, "NONE", "unknown", "NONE"
+
+def resolve_local_version(cargo_path: Path, relative_path: str) -> str:
+    """Resolve version from local path dependency using get_repo_info"""
+    try:
+        # Resolve relative path from current Cargo.toml location
+        local_cargo_path = (cargo_path.parent / relative_path / "Cargo.toml").resolve()
+        if local_cargo_path.exists():
+            repo_info = get_repo_info(local_cargo_path)
+            if repo_info:
+                return repo_info['version']
+    except Exception as e:
+        print(f"{Colors.YELLOW}⚠️  Could not resolve local version for {relative_path}: {e}{Colors.END}")
+    return "LOCAL"
+
+def resolve_workspace_version(cargo_path: Path, dep_info: dict) -> str:
+    """Resolve version from workspace dependency (placeholder for now)"""
+    # TODO: Implement workspace version resolution
+    # Would need to find workspace root and resolve the actual version
+    return "WORKSPACE"
+
+def resolve_git_version(git_repo: str, git_ref: str) -> str:
+    """Resolve version from git dependency using gh command"""
+    try:
+        # Extract owner/repo from git URL
+        if "github.com/" in git_repo:
+            # Handle both SSH and HTTPS URLs
+            if git_repo.startswith("git@github.com:"):
+                repo_path = git_repo.replace("git@github.com:", "").replace(".git", "")
+            elif git_repo.startswith("https://github.com/"):
+                repo_path = git_repo.replace("https://github.com/", "").replace(".git", "")
+            else:
+                return f"GIT#{git_ref[:8]}"
+
+            # Try to get version from Cargo.toml in the repository
+            import subprocess
+            import json
+            import base64
+
+            try:
+                # Get Cargo.toml content from specific branch/commit
+                result = subprocess.run([
+                    "gh", "api", f"repos/{repo_path}/contents/Cargo.toml",
+                    "--jq", ".content"
+                ], capture_output=True, text=True, timeout=10)
+
+                if result.returncode == 0:
+                    # Decode base64 content and parse TOML
+                    content = base64.b64decode(result.stdout.strip()).decode('utf-8')
+                    import toml
+                    cargo_data = toml.loads(content)
+
+                    if 'package' in cargo_data and 'version' in cargo_data['package']:
+                        version = cargo_data['package']['version']
+                        # Return just the semantic version, not git hash
+                        return version
+
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, Exception):
+                pass
+
+            # Fallback: if we can't get Cargo.toml, assume a reasonable default
+            # This handles cases where the repo exists but Cargo.toml is missing/inaccessible
+            return "0.0.0"
+
+        # Ultimate fallback for non-GitHub repos
+        return "0.0.0"
+
+    except Exception as e:
+        return "0.0.0"
+
+def collect_unique_packages_with_sources(cargo_files: List[Path]) -> Dict[str, Tuple[str, str]]:
+    """Collect unique package names with their source info (source_type, source_value)"""
+    packages = {}  # pkg_name -> (source_type, source_value)
+
+    for cargo_path in cargo_files:
+        try:
+            with open(cargo_path, 'r') as f:
+                cargo_data = toml.load(f)
+
+            # Process regular dependencies
+            if 'dependencies' in cargo_data:
+                for dep_name, dep_info in cargo_data['dependencies'].items():
+                    dep_version, features, source_type, source_value = parse_dependency_info(dep_info, cargo_path)
+                    if dep_version and dep_name not in packages:
+                        packages[dep_name] = (source_type, source_value)
+
+            # Process dev-dependencies
+            if 'dev-dependencies' in cargo_data:
+                for dep_name, dep_info in cargo_data['dev-dependencies'].items():
+                    dep_version, features, source_type, source_value = parse_dependency_info(dep_info, cargo_path)
+                    if dep_version and dep_name not in packages:
+                        packages[dep_name] = (source_type, source_value)
+
+        except Exception as e:
+            print(f"{Colors.YELLOW}⚠️  Warning: Could not parse dependencies in {cargo_path}: {e}{Colors.END}")
+
     return packages
 
-def batch_fetch_latest_versions(package_names: Set[str]) -> Dict[str, LatestData]:
-    """Batch fetch latest versions for all packages"""
+def collect_unique_packages(deps: List[DepData]) -> Set[str]:
+    """Collect unique package names (legacy function for compatibility)"""
+    packages = set()
+    for dep in deps:
+        packages.add(dep.pkg_name)
+    return packages
+
+def create_local_repo_lookup(repos: List[RepoData]) -> Dict[str, str]:
+    """Create a lookup map from package names to local paths"""
+    local_lookup = {}
+    for repo in repos:
+        # Map repo name to its path for LOCAL flag detection
+        local_lookup[repo.repo_name] = repo.path
+    return local_lookup
+
+def batch_fetch_latest_versions(packages_with_sources: Dict[str, Tuple[str, str]], hub_info: Optional[HubInfo] = None, repos: Optional[List[RepoData]] = None) -> Dict[str, LatestData]:
+    """Batch fetch latest versions for all packages with source information"""
     latest_data = {}
     pkg_id = 200
 
-    total = len(package_names)
+    # Create local repo lookup for LOCAL flag detection
+    local_lookup = create_local_repo_lookup(repos) if repos else {}
+
+    total = len(packages_with_sources)
     progress = ProgressSpinner(f"Fetching latest versions...", total)
     progress.start()
 
     try:
         processed = 0
-        for pkg_name in sorted(package_names):
+        for pkg_name, (source_type, source_value) in sorted(packages_with_sources.items()):
             processed += 1
             progress.update(processed, f"Fetching {pkg_name}...")
 
-            latest_version = get_latest_version(pkg_name)
-            if latest_version:
-                # Placeholder hub info (will enhance later)
-                hub_version = "NONE"
-                hub_status = "gap"
+            # Fetch version based on source type
+            if source_type == "crate":
+                latest_version = get_latest_version(pkg_name)
+            elif source_type == "git":
+                # For git dependencies, extract the repo URL and resolve the version
+                if "#" in source_value:
+                    repo_url, git_ref = source_value.split("#", 1)
+                else:
+                    repo_url, git_ref = source_value, "main"
+                latest_version = resolve_git_version(repo_url, git_ref)
+            elif source_type == "local":
+                # For local dependencies, we'll need to resolve from the local path
+                latest_version = "LOCAL"
+            elif source_type == "workspace":
+                latest_version = "WORKSPACE"
+            else:
+                latest_version = "UNKNOWN"
+
+            if latest_version or source_type != "crate":
+                # Check if git repos are also available locally
+                final_source_value = source_value
+                if source_type == "git" and pkg_name in local_lookup:
+                    # Git repo is also available locally - add LOCAL flag
+                    final_source_value = f"{source_value} (LOCAL: {local_lookup[pkg_name]})"
+
+                # Check if package is in hub
+                if hub_info and pkg_name in hub_info.dependencies:
+                    hub_version = hub_info.dependencies[pkg_name]
+                    # Determine hub status (only compare for crate dependencies)
+                    if source_type == "crate" and latest_version != "N/A":
+                        hub_ver = parse_version(hub_version)
+                        latest_ver = parse_version(latest_version)
+                        if hub_ver and latest_ver:
+                            if hub_ver == latest_ver:
+                                hub_status = "current"
+                            elif hub_ver < latest_ver:
+                                hub_status = "outdated"
+                            else:
+                                hub_status = "ahead"
+                        else:
+                            hub_status = "unknown"
+                    else:
+                        hub_status = "local"  # Local/git deps in hub
+                else:
+                    hub_version = "NONE"
+                    hub_status = "gap"
 
                 latest_data[pkg_name] = LatestData(
                     pkg_id=pkg_id,
                     pkg_name=pkg_name,
                     latest_version=latest_version,
+                    source_type=source_type,
+                    source_value=final_source_value,
                     hub_version=hub_version,
                     hub_status=hub_status
                 )
@@ -1350,9 +1599,9 @@ def write_tsv_cache(repos: List[RepoData], deps: List[DepData], latest_versions:
     with open(output_file, 'w') as f:
         # Section 1: REPO LIST
         f.write("#------ SECTION : REPO LIST --------#\n")
-        f.write("REPO_ID\tREPO_NAME\tPATH\tPARENT\tLAST_UPDATE\tCARGO_VERSION\n")
+        f.write("REPO_ID\tREPO_NAME\tPATH\tPARENT\tLAST_UPDATE\tCARGO_VERSION\tHUB_USAGE\tHUB_STATUS\n")
         for repo in repos:
-            f.write(f"{repo.repo_id}\t{repo.repo_name}\t{repo.path}\t{repo.parent}\t{repo.last_update}\t{repo.cargo_version}\n")
+            f.write(f"{repo.repo_id}\t{repo.repo_name}\t{repo.path}\t{repo.parent}\t{repo.last_update}\t{repo.cargo_version}\t{repo.hub_usage}\t{repo.hub_status}\n")
         f.write("\n")
 
         # Section 2: DEPS VERSIONS LIST
@@ -1364,9 +1613,9 @@ def write_tsv_cache(repos: List[RepoData], deps: List[DepData], latest_versions:
 
         # Section 3: LATEST LIST
         f.write("#------ SECTION : DEP LATEST LIST --------#\n")
-        f.write("PKG_ID\tPKG_NAME\tLATEST_VERSION\n")
+        f.write("PKG_ID\tPKG_NAME\tLATEST_VERSION\tSOURCE_TYPE\tSOURCE_VALUE\tHUB_VERSION\tHUB_STATUS\n")
         for latest in latest_versions.values():
-            f.write(f"{latest.pkg_id}\t{latest.pkg_name}\t{latest.latest_version}\n")
+            f.write(f"{latest.pkg_id}\t{latest.pkg_name}\t{latest.latest_version}\t{latest.source_type}\t{latest.source_value}\t{latest.hub_version}\t{latest.hub_status}\n")
         f.write("\n")
 
         # Section 4: VERSION MAP LIST
@@ -1577,26 +1826,34 @@ def generate_data_cache(dependencies):
     print(f"{Colors.PURPLE}{Colors.BOLD}📊 GENERATING STRUCTURED DATA CACHE{Colors.END}")
     print(f"{Colors.PURPLE}{'='*80}{Colors.END}\n")
 
+    # Phase 0: Get hub information first (separate container)
+    print(f"{Colors.CYAN}Phase 0: Loading hub information...{Colors.END}")
+    hub_info = get_hub_info()
+    if hub_info:
+        print(f"Found hub at {hub_info.path} (v{hub_info.version}) with {len(hub_info.dependencies)} dependencies")
+    else:
+        print("No hub found in standard locations")
+
     # Phase 1: Discovery
     print(f"{Colors.CYAN}Phase 1: Discovering Cargo.toml files...{Colors.END}")
     cargo_files = find_all_cargo_files_fast()
     print(f"Found {len(cargo_files)} Cargo.toml files")
 
-    # Phase 2: Extract repo metadata
+    # Phase 2: Extract repo metadata (excluding hub)
     print(f"{Colors.CYAN}Phase 2: Extracting repository metadata...{Colors.END}")
-    repos = extract_repo_metadata_batch(cargo_files)
-    print(f"Processed {len(repos)} repositories")
+    repos = extract_repo_metadata_batch(cargo_files, hub_info)
+    print(f"Processed {len(repos)} repositories (hub excluded)")
 
     # Phase 3: Extract dependencies
     print(f"{Colors.CYAN}Phase 3: Extracting dependencies...{Colors.END}")
     deps = extract_dependencies_batch(cargo_files)
-    unique_packages = collect_unique_packages(deps)
+    packages_with_sources = collect_unique_packages_with_sources(cargo_files)
     hub_using_repos = len([r for r in repos if r.hub_status in ['using', 'path', 'workspace']])
-    print(f"Found {len(deps)} dependency entries, {len(unique_packages)} unique packages, {hub_using_repos} repos using hub")
+    print(f"Found {len(deps)} dependency entries, {len(packages_with_sources)} unique packages, {hub_using_repos} repos using hub")
 
-    # Phase 4: Batch fetch latest versions
+    # Phase 4: Batch fetch latest versions with source info
     print(f"{Colors.CYAN}Phase 4: Fetching latest versions...{Colors.END}")
-    latest_versions = batch_fetch_latest_versions(unique_packages)
+    latest_versions = batch_fetch_latest_versions(packages_with_sources, hub_info, repos)
     print(f"Fetched latest versions for {len(latest_versions)} packages")
 
     # Phase 5: Generate analysis data

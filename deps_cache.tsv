@@ -1,24 +1,23 @@
 #------ SECTION : REPO LIST --------#
-REPO_ID	REPO_NAME	PATH	PARENT	LAST_UPDATE	CARGO_VERSION
-100	paintbox	oodx/projects/paintbox/Cargo.toml	projects	1757345459	0.0.1
-101	rolo	oodx/projects/rolo/Cargo.toml	projects	1757992816	0.2.2
-102	xstream	oodx/projects/xstream/Cargo.toml	projects	1757816419	0.2.0
-103	hub	oodx/projects/hub/Cargo.toml	projects	1758218753	0.1.0
-104	kick	oodx/projects/kick/Cargo.toml	projects	1757780024	0.1.0
-105	prontodb	oodx/projects/prontodb/Cargo.toml	projects	1757780232	0.7.0
-106	rsb	oodx/projects/rsb/Cargo.toml	projects	1758138852	0.5.0
-107	syntax	oodx/projects/syntax/Cargo.toml	projects	1757345437	0.1.0
-108	asc100	oodx/projects/asc100/Cargo.toml	projects	1757559858	0.3.0
-109	nox	oodx/projects/nox_server/Cargo.toml	projects	1758124390	0.1.0
-110	boxy	oodx/projects/boxy/Cargo.toml	projects	1758155903	0.15.0
-111	porty	oodx/projects/porty/Cargo.toml	projects	1757913075	0.1.0
-112	jynx	oodx/projects/jynx/Cargo.toml	projects	1758052755	2.0.0
-113	rolo	oodx/concepts/muxy/Cargo.toml	concepts	1758207589	0.1.1
-114	lab1	oodx/concepts/muxy/src/labs/lab1/Cargo.toml	labs	1757775531	0.1.0
-115	lab2	oodx/concepts/muxy/src/labs/lab2/Cargo.toml	labs	1757775534	0.1.0
-116	forge	oodx/concepts/forge/Cargo.toml	concepts	1758126739	0.0.0
-117	padlock	prods/padlokk/padlock_orig/Cargo.toml	padlokk	1757802760	0.1.0
-118	cage	prods/padlokk/cage/Cargo.toml	padlokk	1757837722	0.3.1
+REPO_ID	REPO_NAME	PATH	PARENT	LAST_UPDATE	CARGO_VERSION	HUB_USAGE	HUB_STATUS
+100	paintbox	oodx/projects/paintbox/Cargo.toml	projects	1757345459	0.0.1	NONE	none
+101	rolo	oodx/projects/rolo/Cargo.toml	projects	1757992816	0.2.2	NONE	none
+102	xstream	oodx/projects/xstream/Cargo.toml	projects	1757816419	0.2.0	NONE	none
+103	kick	oodx/projects/kick/Cargo.toml	projects	1757780024	0.1.0	NONE	none
+104	prontodb	oodx/projects/prontodb/Cargo.toml	projects	1757780232	0.7.0	NONE	none
+105	rsb	oodx/projects/rsb/Cargo.toml	projects	1758138852	0.5.0	NONE	none
+106	syntax	oodx/projects/syntax/Cargo.toml	projects	1757345437	0.1.0	NONE	none
+107	asc100	oodx/projects/asc100/Cargo.toml	projects	1757559858	0.3.0	NONE	none
+108	nox	oodx/projects/nox_server/Cargo.toml	projects	1758124390	0.1.0	NONE	none
+109	boxy	oodx/projects/boxy/Cargo.toml	projects	1758155903	0.15.0	NONE	none
+110	porty	oodx/projects/porty/Cargo.toml	projects	1757913075	0.1.0	NONE	none
+111	jynx	oodx/projects/jynx/Cargo.toml	projects	1758052755	2.0.0	NONE	none
+112	rolo	oodx/concepts/muxy/Cargo.toml	concepts	1758207589	0.1.1	NONE	none
+113	lab1	oodx/concepts/muxy/src/labs/lab1/Cargo.toml	labs	1757775531	0.1.0	NONE	none
+114	lab2	oodx/concepts/muxy/src/labs/lab2/Cargo.toml	labs	1757775534	0.1.0	NONE	none
+115	forge	oodx/concepts/forge/Cargo.toml	concepts	1758126739	0.0.0	NONE	none
+116	padlock	prods/padlokk/padlock_orig/Cargo.toml	padlokk	1757802760	0.1.0	NONE	none
+117	cage	prods/padlokk/cage/Cargo.toml	padlokk	1757837722	0.3.1	NONE	none
 
 #------ SECTION : DEP VERSIONS LIST --------#
 DEP_ID	REPO_ID	PKG_NAME	PKG_VERSION	DEP_TYPE	FEATURES
@@ -28,16 +27,16 @@ DEP_ID	REPO_ID	PKG_NAME	PKG_VERSION	DEP_TYPE	FEATURES
 1003	100	unicode-width	0.1	dep	NONE
 1004	100	bitflags	2	dep	NONE
 1005	100	strip-ansi-escapes	0.2	dep	NONE
-1006	100	rsb	git:https://github.com/oodx/rsb-framework#main	dep	NONE
+1006	100	rsb	0.2.18	dep	NONE
 1007	100	pretty_assertions	1	dev-dep	NONE
-1008	101	rsb	path:../rsb	dep	deps-libc
+1008	101	rsb	0.5.0	dep	deps-libc
 1009	101	libc	0.2	dep	NONE
 1010	101	strip-ansi-escapes	0.2	dep	NONE
 1011	101	unicode-width	0.2.1	dep	std
 1012	101	csv	1.3	dep	NONE
 1013	101	serde_json	1.0	dep	NONE
 1014	101	criterion	0.5	dev-dep	NONE
-1015	102	rsb	path:../rsb	dep	NONE
+1015	102	rsb	0.5.0	dep	NONE
 1016	103	base64	0.22	dep	NONE
 1017	103	chrono	0.4	dep	serde
 1018	103	glob	0.3.1	dep	NONE
@@ -87,8 +86,8 @@ DEP_ID	REPO_ID	PKG_NAME	PKG_VERSION	DEP_TYPE	FEATURES
 1062	105	tempfile	3	dep	NONE
 1063	105	serde	1	dep	derive
 1064	105	serde_json	1	dep	NONE
-1065	105	rsb	path:../rsb2	dep	visuals,stdopts
-1066	105	xstream	path:../xstream	dep	NONE
+1065	105	rsb	LOCAL	dep	visuals,stdopts
+1066	105	xstream	0.2.0	dep	NONE
 1067	105	zstd	0.13	dep	NONE
 1068	105	aes-gcm	0.10	dep	aes
 1069	105	pbkdf2	0.12	dep	NONE
@@ -110,8 +109,8 @@ DEP_ID	REPO_ID	PKG_NAME	PKG_VERSION	DEP_TYPE	FEATURES
 1085	106	assert_cmd	2.0	dev-dep	NONE
 1086	106	predicates	3.0	dev-dep	NONE
 1087	106	assert_fs	1.0	dev-dep	NONE
-1088	107	rsb	git:https://github.com/oodx/rebel#main	dep	NONE
-1089	107	paintbox	path:../paintbox	dep	NONE
+1088	107	rsb	2.1.0	dep	NONE
+1089	107	paintbox	0.0.1	dep	NONE
 1090	108	rand	0.9	dep	NONE
 1091	108	regex	1.10	dep	NONE
 1092	108	uuid	1.6	dep	v4,fast-rng
@@ -157,9 +156,9 @@ DEP_ID	REPO_ID	PKG_NAME	PKG_VERSION	DEP_TYPE	FEATURES
 1132	110	serde	1.0	dep	derive
 1133	110	serde_yaml	0.9	dep	NONE
 1134	110	chrono	0.4	dep	serde
-1135	110	rsb	git:https://github.com/oodx/rsb#main	dep	NONE
+1135	110	rsb	0.5.0	dep	NONE
 1136	111	tokio	1	dep	full
-1137	111	rsb	path:../rsb	dep	NONE
+1137	111	rsb	0.5.0	dep	NONE
 1138	111	anyhow	1	dep	NONE
 1139	111	log	0.4	dep	NONE
 1140	111	env_logger	0.11	dep	NONE
@@ -170,15 +169,15 @@ DEP_ID	REPO_ID	PKG_NAME	PKG_VERSION	DEP_TYPE	FEATURES
 1145	112	serde_yaml	0.9	dep	NONE
 1146	112	regex	1.5	dep	NONE
 1147	112	clap	4.0	dep	derive
-1148	112	rsb	git:https://github.com/oodx/rsb#main	dep	NONE
+1148	112	rsb	0.5.0	dep	NONE
 1149	112	criterion	0.7	dev-dep	NONE
-1150	113	boxy	path:../boxy	dep	NONE
+1150	113	boxy	LOCAL	dep	NONE
 1151	113	unicode-width	0.2.1	dep	NONE
-1152	113	rsb	path:../rsb	dep	visuals
+1152	113	rsb	LOCAL	dep	visuals
 1153	113	libc	0.2	dep	NONE
-1154	114	rolo	path:../..	dep	NONE
-1155	115	rolo	path:../..	dep	NONE
-1156	116	rsb	git:https://github.com/oodx/rsb#main	dep	NONE
+1154	114	rolo	LOCAL	dep	NONE
+1155	115	rolo	LOCAL	dep	NONE
+1156	116	rsb	0.5.0	dep	NONE
 1157	117	portable-pty	0.9	dep	NONE
 1158	117	tempfile	3.8	dep	NONE
 1159	117	chrono	0.4	dep	serde
@@ -200,235 +199,247 @@ DEP_ID	REPO_ID	PKG_NAME	PKG_VERSION	DEP_TYPE	FEATURES
 1175	118	which	6.0	dep	NONE
 
 #------ SECTION : DEP LATEST LIST --------#
-PKG_ID	PKG_NAME	LATEST_VERSION
-200	aes-gcm	0.11.0-rc.1
-201	anyhow	1.0.99
-202	assert_cmd	2.0.17
-203	assert_fs	1.1.3
-204	assert_matches	1.5.0
-205	async-trait	0.1.89
-206	atty	0.2.14
-207	base64	0.22.1
-208	bitflags	2.9.4
-209	bytes	1.10.1
-210	chrono	0.4.42
-211	clap	4.5.47
-212	cookie	0.18.1
-213	criterion	0.7.0
-214	csv	1.3.1
-215	directories	6.0.0
-216	dirs	6.0.0
-217	env_logger	0.11.8
-218	futures	0.3.31
-219	glob	0.3.3
-220	handlebars	6.3.2
-221	hex	0.4.3
-222	http	1.3.1
-223	http-body-util	0.1.3
-224	hyper	1.7.0
-225	hyper-tls	0.6.0
-226	hyper-util	0.1.17
-227	lazy_static	1.5.0
-228	libc	1.0.0-alpha.1
-229	log	0.4.28
-230	md5	0.8.0
-231	mime	0.3.17
-232	mime_guess	2.0.5
-233	mockito	1.7.0
-234	notify	8.2.0
-235	pbkdf2	0.13.0-rc.1
-236	pin-project	1.1.10
-237	portable-pty	0.9.0
-238	predicates	3.1.3
-239	pretty_assertions	1.4.1
-240	rand	0.10.0-rc.0
-241	redis	1.0.0-alpha.1
-242	regex	1.11.2
-243	reqwest	0.12.23
-244	rpassword	7.4.0
-245	rusqlite	0.37.0
-246	serde	1.0.225
-247	serde_json	1.0.145
-248	serde_yaml	0.9.34+deprecated
-249	sha2	0.11.0-rc.2
-250	sqlx	0.8.6
-251	strip-ansi-escapes	0.2.1
-252	tempfile	3.22.0
-253	thiserror	2.0.16
-254	tokio	1.47.1
-255	tokio-test	0.4.4
-256	toml	0.9.7
-257	tracing	0.1.41
-258	tracing-subscriber	0.3.20
-259	unicode-segmentation	1.12.0
-260	unicode-width	0.2.1
-261	url	2.5.7
-262	urlencoding	2.1.3
-263	uuid	1.18.1
-264	which	8.0.0
-265	wiremock	0.6.5
-266	zstd	0.13.3
+PKG_ID	PKG_NAME	LATEST_VERSION	SOURCE_TYPE	SOURCE_VALUE	HUB_VERSION	HUB_STATUS
+200	aes-gcm	0.11.0-rc.1	crate	0.10	NONE	gap
+201	anyhow	1.0.99	crate	1.0	NONE	gap
+202	assert_cmd	2.0.17	crate	2.0	NONE	gap
+203	assert_fs	1.1.3	crate	1.0	NONE	gap
+204	assert_matches	1.5.0	crate	1.5	NONE	gap
+205	async-trait	0.1.89	crate	0.1	NONE	gap
+206	atty	0.2.14	crate	0.2	NONE	gap
+207	base64	0.22.1	crate	0.22	0.22	outdated
+208	bitflags	2.9.4	crate	2	NONE	gap
+209	boxy	LOCAL	local	../boxy	NONE	gap
+210	bytes	1.10.1	crate	1.0	NONE	gap
+211	chrono	0.4.42	crate	0.4	0.4	outdated
+212	clap	4.5.47	crate	4.0	NONE	gap
+213	cookie	0.18.1	crate	0.18	NONE	gap
+214	criterion	0.7.0	crate	0.5	NONE	gap
+215	csv	1.3.1	crate	1.3	NONE	gap
+216	directories	6.0.0	crate	6	NONE	gap
+217	dirs	6.0.0	crate	6.0	NONE	gap
+218	env_logger	0.11.8	crate	0.11	NONE	gap
+219	futures	0.3.31	crate	0.3	NONE	gap
+220	glob	0.3.3	crate	0.3.1	0.3.1	outdated
+221	handlebars	6.3.2	crate	4.0	NONE	gap
+222	hex	0.4.3	crate	0.4	NONE	gap
+223	http	1.3.1	crate	1.0	NONE	gap
+224	http-body-util	0.1.3	crate	0.1	NONE	gap
+225	hyper	1.7.0	crate	1.0	NONE	gap
+226	hyper-tls	0.6.0	crate	0.6	NONE	gap
+227	hyper-util	0.1.17	crate	0.1	NONE	gap
+228	lazy_static	1.5.0	crate	1.4.0	1.4.0	outdated
+229	libc	1.0.0-alpha.1	crate	0.2	0.2.153	outdated
+230	log	0.4.28	crate	0.4	NONE	gap
+231	md5	0.8.0	crate	0.8	NONE	gap
+232	mime	0.3.17	crate	0.3	NONE	gap
+233	mime_guess	2.0.5	crate	2.0	NONE	gap
+234	mockito	1.7.0	crate	1.4	NONE	gap
+235	notify	8.2.0	crate	8.0	NONE	gap
+236	paintbox	LOCAL	local	../paintbox	NONE	gap
+237	pbkdf2	0.13.0-rc.1	crate	0.12	NONE	gap
+238	pin-project	1.1.10	crate	1.0	NONE	gap
+239	portable-pty	0.9.0	crate	0.9	0.9	current
+240	predicates	3.1.3	crate	3.0	NONE	gap
+241	pretty_assertions	1.4.1	crate	1	NONE	gap
+242	rand	0.10.0-rc.0	crate	0.9.2	0.9.2	outdated
+243	redis	1.0.0-alpha.1	crate	0.32	NONE	gap
+244	regex	1.11.2	crate	1.10.2	1.10.2	outdated
+245	reqwest	0.12.23	crate	0.12	NONE	gap
+246	rolo	LOCAL	local	../..	NONE	gap
+247	rpassword	7.4.0	crate	7.3	NONE	gap
+248	rsb	0.2.18	git	https://github.com/oodx/rsb-framework#main (LOCAL: oodx/projects/rsb/Cargo.toml)	NONE	gap
+249	rusqlite	0.37.0	crate	0.37	NONE	gap
+250	serde	1.0.225	crate	1	1.0	outdated
+251	serde_json	1.0.145	crate	1.0	1.0	outdated
+252	serde_yaml	0.9.34+deprecated	crate	0.9	NONE	gap
+253	sha2	0.11.0-rc.2	crate	0.10	NONE	gap
+254	sqlx	0.8.6	crate	0.7	NONE	gap
+255	strip-ansi-escapes	0.2.1	crate	0.2	NONE	gap
+256	tempfile	3.22.0	crate	3.0	NONE	gap
+257	thiserror	2.0.16	crate	2.0.16	NONE	gap
+258	tokio	1.47.1	crate	1.0	NONE	gap
+259	tokio-test	0.4.4	crate	0.4	NONE	gap
+260	toml	0.9.7	crate	0.9.5	NONE	gap
+261	tracing	0.1.41	crate	0.1	NONE	gap
+262	tracing-subscriber	0.3.20	crate	0.3	NONE	gap
+263	unicode-segmentation	1.12.0	crate	1.10	NONE	gap
+264	unicode-width	0.2.1	crate	0.1	NONE	gap
+265	url	2.5.7	crate	2.0	NONE	gap
+266	urlencoding	2.1.3	crate	2.1.3	2.1.3	current
+267	uuid	1.18.1	crate	1.17.0	1.17.0	outdated
+268	which	8.0.0	crate	6.0	NONE	gap
+269	wiremock	0.6.5	crate	0.6	NONE	gap
+270	xstream	LOCAL	local	../xstream	NONE	gap
+271	zstd	0.13.3	crate	0.13	NONE	gap
 
 #------ SECTION : VERSION MAP LIST --------#
 MAP_ID	DEP_ID	PKG_ID	REPO_ID	VERSION_STATE	BREAKING_TYPE	ECOSYSTEM_STATUS
-300	1000	246	100	stable	safe	normal
-301	1001	248	100	unstable	safe	normal
-302	1002	259	100	stable	safe	normal
-303	1003	260	100	unstable	BREAKING	normal
+300	1000	250	100	stable	safe	normal
+301	1001	252	100	unstable	safe	normal
+302	1002	263	100	stable	safe	normal
+303	1003	264	100	unstable	BREAKING	normal
 304	1004	208	100	stable	safe	normal
-305	1005	251	100	unstable	safe	normal
-306	1007	239	100	stable	safe	normal
-307	1009	228	101	unstable	BREAKING	normal
-308	1010	251	101	unstable	safe	normal
-309	1011	260	101	unstable	current	normal
-310	1012	214	101	stable	safe	normal
-311	1013	247	101	stable	safe	normal
-312	1014	213	101	unstable	BREAKING	normal
-313	1016	207	103	unstable	safe	normal
-314	1017	210	103	unstable	safe	normal
-315	1018	219	103	unstable	safe	normal
-316	1019	227	103	stable	safe	normal
-317	1020	228	103	unstable	BREAKING	normal
-318	1021	237	103	unstable	current	normal
-319	1022	240	103	unstable	BREAKING	normal
-320	1023	242	103	stable	safe	normal
-321	1024	246	103	stable	safe	normal
-322	1025	247	103	stable	safe	normal
-323	1026	262	103	stable	current	normal
-324	1027	263	103	stable	safe	normal
-325	1028	202	103	stable	safe	normal
-326	1029	238	103	stable	safe	normal
-327	1030	224	104	stable	safe	normal
-328	1031	226	104	unstable	safe	normal
-329	1032	223	104	unstable	safe	normal
-330	1033	225	104	unstable	current	normal
-331	1034	254	104	stable	safe	normal
-332	1035	246	104	stable	safe	normal
-333	1036	247	104	stable	safe	normal
-334	1037	256	104	unstable	safe	normal
-335	1038	216	104	stable	current	normal
-336	1039	253	104	stable	current	normal
-337	1040	201	104	stable	safe	normal
-338	1041	205	104	unstable	safe	normal
-339	1042	218	104	unstable	safe	normal
-340	1043	209	104	stable	safe	normal
-341	1044	236	104	stable	safe	normal
-342	1045	231	104	unstable	safe	normal
-343	1046	261	104	stable	safe	normal
-344	1047	263	104	stable	safe	normal
-345	1048	257	104	unstable	safe	normal
-346	1049	211	104	stable	safe	normal
-347	1050	258	104	unstable	safe	normal
-348	1051	210	104	unstable	safe	normal
-349	1052	252	104	stable	safe	normal
-350	1053	255	104	unstable	safe	normal
-351	1054	204	104	stable	current	normal
-352	1055	233	104	stable	safe	normal
-353	1056	265	104	unstable	safe	normal
-354	1057	201	105	stable	safe	normal
-355	1058	206	105	unstable	safe	normal
-356	1059	215	105	stable	current	normal
-357	1060	230	105	unstable	current	normal
-358	1061	245	105	unstable	current	normal
-359	1062	252	105	stable	safe	normal
-360	1063	246	105	stable	safe	normal
-361	1064	247	105	stable	safe	normal
-362	1067	266	105	unstable	safe	normal
-363	1068	200	105	unstable	BREAKING	normal
-364	1069	235	105	unstable	BREAKING	normal
-365	1070	249	105	unstable	BREAKING	normal
-366	1071	202	105	stable	safe	normal
-367	1072	238	105	stable	safe	normal
-368	1073	227	106	stable	safe	normal
-369	1074	242	106	stable	safe	normal
-370	1075	228	106	unstable	BREAKING	normal
-371	1076	210	106	unstable	safe	normal
-372	1077	219	106	unstable	safe	normal
-373	1078	240	106	unstable	BREAKING	normal
-374	1079	263	106	stable	safe	normal
-375	1080	207	106	unstable	safe	normal
-376	1081	262	106	stable	current	normal
-377	1082	246	106	stable	safe	normal
-378	1083	247	106	stable	safe	normal
-379	1084	237	106	unstable	current	normal
-380	1085	202	106	stable	safe	normal
-381	1086	238	106	stable	safe	normal
-382	1087	203	106	stable	safe	normal
-383	1090	240	108	unstable	BREAKING	normal
-384	1091	242	108	stable	safe	normal
-385	1092	263	108	stable	safe	normal
-386	1093	240	108	unstable	BREAKING	normal
-387	1094	263	108	stable	safe	normal
-388	1095	224	109	stable	safe	normal
-389	1096	226	109	unstable	safe	normal
-390	1097	225	109	unstable	current	normal
-391	1098	254	109	stable	safe	normal
-392	1099	246	109	stable	safe	normal
-393	1100	247	109	stable	safe	normal
-394	1101	248	109	unstable	safe	normal
-395	1102	253	109	stable	current	normal
-396	1103	201	109	stable	safe	normal
-397	1104	205	109	unstable	safe	normal
-398	1105	218	109	unstable	safe	normal
-399	1106	209	109	stable	safe	normal
-400	1107	211	109	stable	safe	normal
-401	1108	216	109	stable	current	normal
-402	1109	257	109	unstable	safe	normal
-403	1110	258	109	unstable	safe	normal
-404	1111	231	109	unstable	safe	normal
-405	1112	232	109	stable	safe	normal
-406	1113	222	109	stable	safe	normal
-407	1114	223	109	unstable	safe	normal
-408	1115	261	109	stable	safe	normal
-409	1116	220	109	stable	BREAKING	normal
-410	1117	242	109	stable	safe	normal
-411	1118	210	109	unstable	safe	normal
-412	1119	263	109	stable	safe	normal
-413	1120	212	109	unstable	safe	normal
-414	1121	250	109	unstable	BREAKING	normal
-415	1122	241	109	unstable	BREAKING	normal
-416	1123	207	109	unstable	safe	normal
-417	1124	240	109	unstable	BREAKING	normal
-418	1125	234	109	stable	safe	normal
-419	1126	243	109	unstable	safe	normal
-420	1127	252	109	stable	safe	normal
-421	1128	255	109	unstable	safe	normal
-422	1129	260	110	unstable	safe	normal
-423	1130	251	110	unstable	safe	normal
-424	1131	242	110	stable	safe	normal
-425	1132	246	110	stable	safe	normal
-426	1133	248	110	unstable	safe	normal
-427	1134	210	110	unstable	safe	normal
-428	1136	254	111	stable	safe	normal
-429	1138	201	111	stable	safe	normal
-430	1139	229	111	unstable	safe	normal
-431	1140	217	111	unstable	safe	normal
-432	1141	246	111	stable	safe	normal
-433	1142	256	111	unstable	safe	normal
-434	1143	210	111	unstable	safe	normal
-435	1144	246	112	stable	safe	normal
-436	1145	248	112	unstable	safe	normal
-437	1146	242	112	stable	safe	normal
-438	1147	211	112	stable	safe	normal
-439	1149	213	112	unstable	current	normal
-440	1151	260	113	unstable	current	normal
-441	1153	228	113	unstable	BREAKING	normal
-442	1157	237	117	unstable	current	normal
-443	1158	252	117	stable	safe	normal
-444	1159	210	117	unstable	safe	normal
-445	1160	211	117	stable	safe	normal
-446	1161	254	117	stable	safe	normal
-447	1162	246	117	stable	safe	normal
-448	1163	247	117	stable	safe	normal
-449	1164	253	117	stable	safe	normal
-450	1165	249	117	unstable	BREAKING	normal
-451	1166	221	117	unstable	safe	normal
-452	1167	240	117	unstable	BREAKING	normal
-453	1168	237	118	unstable	current	normal
-454	1169	252	118	stable	safe	normal
-455	1170	210	118	unstable	safe	normal
-456	1171	246	118	stable	safe	normal
-457	1172	247	118	stable	safe	normal
-458	1173	253	118	stable	safe	normal
-459	1174	244	118	stable	safe	normal
-460	1175	264	118	stable	BREAKING	normal
+305	1005	255	100	unstable	safe	normal
+306	1006	248	100	unstable	current	normal
+307	1007	241	100	stable	safe	normal
+308	1008	248	101	unstable	current	normal
+309	1009	229	101	unstable	BREAKING	normal
+310	1010	255	101	unstable	safe	normal
+311	1011	264	101	unstable	current	normal
+312	1012	215	101	stable	safe	normal
+313	1013	251	101	stable	safe	normal
+314	1014	214	101	unstable	BREAKING	normal
+315	1015	248	102	unstable	current	normal
+316	1016	207	103	unstable	safe	normal
+317	1017	211	103	unstable	safe	normal
+318	1018	220	103	unstable	safe	normal
+319	1019	228	103	stable	safe	normal
+320	1020	229	103	unstable	BREAKING	normal
+321	1021	239	103	unstable	current	normal
+322	1022	242	103	unstable	BREAKING	normal
+323	1023	244	103	stable	safe	normal
+324	1024	250	103	stable	safe	normal
+325	1025	251	103	stable	safe	normal
+326	1026	266	103	stable	current	normal
+327	1027	267	103	stable	safe	normal
+328	1028	202	103	stable	safe	normal
+329	1029	240	103	stable	safe	normal
+330	1030	225	104	stable	safe	normal
+331	1031	227	104	unstable	safe	normal
+332	1032	224	104	unstable	safe	normal
+333	1033	226	104	unstable	current	normal
+334	1034	258	104	stable	safe	normal
+335	1035	250	104	stable	safe	normal
+336	1036	251	104	stable	safe	normal
+337	1037	260	104	unstable	safe	normal
+338	1038	217	104	stable	current	normal
+339	1039	257	104	stable	current	normal
+340	1040	201	104	stable	safe	normal
+341	1041	205	104	unstable	safe	normal
+342	1042	219	104	unstable	safe	normal
+343	1043	210	104	stable	safe	normal
+344	1044	238	104	stable	safe	normal
+345	1045	232	104	unstable	safe	normal
+346	1046	265	104	stable	safe	normal
+347	1047	267	104	stable	safe	normal
+348	1048	261	104	unstable	safe	normal
+349	1049	212	104	stable	safe	normal
+350	1050	262	104	unstable	safe	normal
+351	1051	211	104	unstable	safe	normal
+352	1052	256	104	stable	safe	normal
+353	1053	259	104	unstable	safe	normal
+354	1054	204	104	stable	current	normal
+355	1055	234	104	stable	safe	normal
+356	1056	269	104	unstable	safe	normal
+357	1057	201	105	stable	safe	normal
+358	1058	206	105	unstable	safe	normal
+359	1059	216	105	stable	current	normal
+360	1060	231	105	unstable	current	normal
+361	1061	249	105	unstable	current	normal
+362	1062	256	105	stable	safe	normal
+363	1063	250	105	stable	safe	normal
+364	1064	251	105	stable	safe	normal
+365	1065	248	105	unknown	unknown	normal
+366	1066	270	105	unstable	unknown	normal
+367	1067	271	105	unstable	safe	normal
+368	1068	200	105	unstable	BREAKING	normal
+369	1069	237	105	unstable	BREAKING	normal
+370	1070	253	105	unstable	BREAKING	normal
+371	1071	202	105	stable	safe	normal
+372	1072	240	105	stable	safe	normal
+373	1073	228	106	stable	safe	normal
+374	1074	244	106	stable	safe	normal
+375	1075	229	106	unstable	BREAKING	normal
+376	1076	211	106	unstable	safe	normal
+377	1077	220	106	unstable	safe	normal
+378	1078	242	106	unstable	BREAKING	normal
+379	1079	267	106	stable	safe	normal
+380	1080	207	106	unstable	safe	normal
+381	1081	266	106	stable	current	normal
+382	1082	250	106	stable	safe	normal
+383	1083	251	106	stable	safe	normal
+384	1084	239	106	unstable	current	normal
+385	1085	202	106	stable	safe	normal
+386	1086	240	106	stable	safe	normal
+387	1087	203	106	stable	safe	normal
+388	1088	248	107	stable	current	normal
+389	1089	236	107	unstable	unknown	normal
+390	1090	242	108	unstable	BREAKING	normal
+391	1091	244	108	stable	safe	normal
+392	1092	267	108	stable	safe	normal
+393	1093	242	108	unstable	BREAKING	normal
+394	1094	267	108	stable	safe	normal
+395	1095	225	109	stable	safe	normal
+396	1096	227	109	unstable	safe	normal
+397	1097	226	109	unstable	current	normal
+398	1098	258	109	stable	safe	normal
+399	1099	250	109	stable	safe	normal
+400	1100	251	109	stable	safe	normal
+401	1101	252	109	unstable	safe	normal
+402	1102	257	109	stable	current	normal
+403	1103	201	109	stable	safe	normal
+404	1104	205	109	unstable	safe	normal
+405	1105	219	109	unstable	safe	normal
+406	1106	210	109	stable	safe	normal
+407	1107	212	109	stable	safe	normal
+408	1108	217	109	stable	current	normal
+409	1109	261	109	unstable	safe	normal
+410	1110	262	109	unstable	safe	normal
+411	1111	232	109	unstable	safe	normal
+412	1112	233	109	stable	safe	normal
+413	1113	223	109	stable	safe	normal
+414	1114	224	109	unstable	safe	normal
+415	1115	265	109	stable	safe	normal
+416	1116	221	109	stable	BREAKING	normal
+417	1117	244	109	stable	safe	normal
+418	1118	211	109	unstable	safe	normal
+419	1119	267	109	stable	safe	normal
+420	1120	213	109	unstable	safe	normal
+421	1121	254	109	unstable	BREAKING	normal
+422	1122	243	109	unstable	BREAKING	normal
+423	1123	207	109	unstable	safe	normal
+424	1124	242	109	unstable	BREAKING	normal
+425	1125	235	109	stable	safe	normal
+426	1126	245	109	unstable	safe	normal
+427	1127	256	109	stable	safe	normal
+428	1128	259	109	unstable	safe	normal
+429	1129	264	110	unstable	safe	normal
+430	1130	255	110	unstable	safe	normal
+431	1131	244	110	stable	safe	normal
+432	1132	250	110	stable	safe	normal
+433	1133	252	110	unstable	safe	normal
+434	1134	211	110	unstable	safe	normal
+435	1135	248	110	unstable	current	normal
+436	1136	258	111	stable	safe	normal
+437	1137	248	111	unstable	current	normal
+438	1138	201	111	stable	safe	normal
+439	1139	230	111	unstable	safe	normal
+440	1140	218	111	unstable	safe	normal
+441	1141	250	111	stable	safe	normal
+442	1142	260	111	unstable	safe	normal
+443	1143	211	111	unstable	safe	normal
+444	1144	250	112	stable	safe	normal
+445	1145	252	112	unstable	safe	normal
+446	1146	244	112	stable	safe	normal
+447	1147	212	112	stable	safe	normal
+448	1148	248	112	unstable	current	normal
+449	1149	214	112	unstable	current	normal
+450	1150	209	113	unknown	unknown	normal
+451	1151	264	113	unstable	current	normal
+452	1152	248	113	unknown	unknown	normal
+453	1153	229	113	unstable	BREAKING	normal
+454	1154	246	114	unknown	unknown	normal
+455	1155	246	115	unknown	unknown	normal
+456	1156	248	116	unstable	current	normal
+457	1157	239	117	unstable	current	normal
+458	1158	256	117	stable	safe	normal
+459	1159	211	117	unstable	safe	normal
+460	1160	212	117	stable	safe	normal
+461	1161	258	117	stable	safe	normal
+462	1162	250	117	stable	safe	normal
+463	1163	251	117	stable	safe	normal
+464	1164	257	117	stable	safe	normal
+465	1165	253	117	unstable	BREAKING	normal
+466	1166	222	117	unstable	safe	normal
+467	1167	242	117	unstable	BREAKING	normal
