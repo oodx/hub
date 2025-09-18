@@ -513,8 +513,9 @@ def export_raw_data(dependencies):
         raise
 
 def detailed_review(dependencies):
-    """Show detailed review with latest versions"""
-    print(f"{Colors.WHITE}{Colors.BOLD}📋 DETAILED DEPENDENCY REVIEW{Colors.END}")
+    """Show detailed review with latest versions across entire ecosystem"""
+    print(f"{Colors.WHITE}{Colors.BOLD}📋 ECOSYSTEM DEPENDENCY REVIEW{Colors.END}")
+    print(f"{Colors.GRAY}Status of each dependency across all Rust projects (ignoring hub){Colors.END}")
     print(f"{Colors.GRAY}{'='*80}{Colors.END}\n")
 
     # Load latest versions from data file if it exists
@@ -541,10 +542,17 @@ def detailed_review(dependencies):
         if version_usages:
             filtered_deps[dep_name] = version_usages
 
-    sorted_deps = sorted(filtered_deps.items())
+    # Sort by usage count (descending), then alphabetically by package name
+    def sort_key(item):
+        dep_name, usages = item
+        # Count unique repos using this dependency
+        repo_count = len(set(parent_repo for parent_repo, _, _, _ in usages))
+        return (-repo_count, dep_name)  # Negative for descending order
+
+    sorted_deps = sorted(filtered_deps.items(), key=sort_key)
 
     # Header
-    print(f"{Colors.WHITE}{Colors.BOLD}{'Package':<20} {'Ecosystem':<12} {'Latest':<12} {'Status':<10} {'Repos Using'}{Colors.END}")
+    print(f"{Colors.WHITE}{Colors.BOLD}{'Package':<20} {'#U':<4} {'Ecosystem':<14} {'Latest'}{Colors.END}")
     print(f"{Colors.GRAY}{'-' * 80}{Colors.END}")
 
     for dep_name, usages in sorted_deps:
@@ -570,40 +578,53 @@ def detailed_review(dependencies):
         else:
             latest_version = latest_cache[dep_name]
 
-        # Status and colors
+        # Status and smart coloring logic
         has_conflict = len(versions) > 1
         latest_str = latest_version if latest_version else "unknown"
 
+        # Determine block color for ecosystem version
         if has_conflict:
-            status_color = Colors.RED
-            status = "CONFLICT"
+            status_block = f"{Colors.RED}■{Colors.END}"
         elif latest_version and parse_version(latest_version) and parse_version(latest_version) > max_version:
-            status_color = Colors.YELLOW
-            status = "OUTDATED"
+            status_block = f"{Colors.ORANGE}■{Colors.END}"
         else:
-            status_color = Colors.GREEN
-            status = "CURRENT"
-
-        # Latest version color (cyan for latest available)
-        latest_color = Colors.CYAN if latest_version else Colors.GRAY
-
-        # Ecosystem version color
-        eco_color = Colors.GREEN if not has_conflict else Colors.RED
+            status_block = f"{Colors.GRAY}■{Colors.END}"
 
         # Count repos using this dependency
         repo_count = len(set(parent_repo for parent_repo, _, _, _ in usages))
 
-        print(f"{Colors.WHITE}{dep_name:<20}{Colors.END} "
-              f"{eco_color}{ecosystem_version:<12}{Colors.END} "
-              f"{latest_color}{latest_str:<12}{Colors.END} "
-              f"{status_color}{status:<10}{Colors.END} "
-              f"{Colors.GRAY}{repo_count} repos{Colors.END}")
+        # Smart version coloring - only highlight differences
+        # Compare parsed versions to handle "0.9" vs "0.9.0" properly
+        ecosystem_parsed = parse_version(ecosystem_version)
+        latest_parsed = parse_version(latest_str) if latest_str != "unknown" else None
+        versions_match = (ecosystem_parsed and latest_parsed and ecosystem_parsed == latest_parsed)
+
+        if versions_match:
+            # Versions match - keep latest gray, but eco still gets block
+            eco_with_block = f"{status_block} {Colors.GRAY}{ecosystem_version:<12}{Colors.END}"
+            latest_colored = f"{Colors.GRAY}{latest_str}{Colors.END}"
+        else:
+            # Versions differ - color ecosystem by status, latest in blue
+            if has_conflict:
+                eco_with_block = f"{status_block} {Colors.RED}{ecosystem_version:<12}{Colors.END}"
+            elif latest_version and parse_version(latest_version) and parse_version(latest_version) > max_version:
+                eco_with_block = f"{status_block} {Colors.ORANGE}{ecosystem_version:<12}{Colors.END}"
+            else:
+                eco_with_block = f"{status_block} {Colors.GRAY}{ecosystem_version:<12}{Colors.END}"
+
+            latest_colored = f"{Colors.CYAN}{latest_str}{Colors.END}"
+
+        # Print gray row with block in front of ecosystem version
+        print(f"{Colors.GRAY}{dep_name:<20} "
+              f"{repo_count:<4} "
+              f"{Colors.END}{eco_with_block} "
+              f"{latest_colored}")
 
     print(f"\n{Colors.PURPLE}{Colors.BOLD}Legend:{Colors.END}")
-    print(f"{Colors.GREEN}CURRENT{Colors.END}  - Using latest version, no conflicts")
-    print(f"{Colors.YELLOW}OUTDATED{Colors.END} - Newer version available on crates.io")
-    print(f"{Colors.RED}CONFLICT{Colors.END} - Multiple versions in ecosystem")
-    print(f"{Colors.CYAN}Latest{Colors.END}   - Latest version from crates.io")
+    print(f"{Colors.GRAY}■{Colors.END} UPDATED   - Using latest version, no conflicts in ecosystem")
+    print(f"{Colors.ORANGE}■{Colors.END} OUTDATED  - Newer version available on crates.io")
+    print(f"{Colors.RED}■{Colors.END} CONFLICT  - Multiple versions in ecosystem")
+    print(f"Versions: Only colored when {Colors.ORANGE}ecosystem{Colors.END} ≠ {Colors.CYAN}latest{Colors.END}")
 
 def analyze_package(dependencies, package_name):
     """Analyze specific package usage across ecosystem"""
@@ -742,7 +763,7 @@ def analyze_hub_status(dependencies):
 
         for dep_name, hub_ver, latest_ver, usage in hub_current:
             usage_color = Colors.GREEN if usage >= 5 else Colors.WHITE if usage >= 3 else Colors.GRAY
-            print(f"  {Colors.GREEN}{dep_name:<20}{Colors.END} "
+            print(f"  {Colors.WHITE}{dep_name:<20}{Colors.END} "
                   f"{Colors.WHITE}{hub_ver:<15}{Colors.END} "
                   f"{Colors.CYAN}{latest_ver:<15}{Colors.END} "
                   f"{usage_color}({usage} projects){Colors.END}")
@@ -756,7 +777,7 @@ def analyze_hub_status(dependencies):
 
         for dep_name, hub_ver, latest_ver, usage in hub_outdated:
             usage_color = Colors.GREEN if usage >= 5 else Colors.WHITE if usage >= 3 else Colors.GRAY
-            print(f"  {Colors.ORANGE}{dep_name:<20}{Colors.END} "
+            print(f"  {Colors.WHITE}{dep_name:<20}{Colors.END} "
                   f"{Colors.YELLOW}{hub_ver:<15}{Colors.END} "
                   f"{Colors.CYAN}{latest_ver:<15}{Colors.END} "
                   f"{usage_color}({usage} projects){Colors.END}")
