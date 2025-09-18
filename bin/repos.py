@@ -1272,17 +1272,29 @@ def extract_dependencies_batch(cargo_files: List[Path]) -> List[DepData]:
     deps = []
     dep_id = 1000
 
-    # Create repo_id lookup
+    # Create repo_id lookup - only for valid repos (apply same filtering as extract_repo_metadata_batch)
     repo_lookup = {}
     repo_id = 100
+
     for cargo_path in cargo_files:
+        repo_info = get_repo_info(cargo_path)
+        if not repo_info:
+            continue
+
+        # Skip hub itself (same filter as in extract_repo_metadata_batch)
+        if repo_info['repo_name'] == 'hub':
+            continue
+
         repo_lookup[str(cargo_path)] = repo_id
         repo_id += 1
 
     for cargo_path in cargo_files:
         try:
-            cargo_data = load_toml(cargo_path)
+            # Skip if this cargo file was filtered out during repo_lookup creation
+            if str(cargo_path) not in repo_lookup:
+                continue
 
+            cargo_data = load_toml(cargo_path)
             current_repo_id = repo_lookup[str(cargo_path)]
 
             # Process regular dependencies
