@@ -1243,9 +1243,7 @@ def extract_repo_metadata_batch(cargo_files: List[Path], hub_info: Optional[HubI
         if not repo_info:
             continue
 
-        # Skip hub itself (don't count hub when walking repos)
-        if hub_info and repo_info['repo_name'] == 'hub':
-            continue
+        # Include hub in analysis (hub is part of the ecosystem)
 
         # Get parent repo info
         parent_repo = get_parent_repo(cargo_path)
@@ -1281,9 +1279,7 @@ def extract_dependencies_batch(cargo_files: List[Path]) -> List[DepData]:
         if not repo_info:
             continue
 
-        # Skip hub itself (same filter as in extract_repo_metadata_batch)
-        if repo_info['repo_name'] == 'hub':
-            continue
+        # Include hub in dependency analysis (consistent with repo metadata)
 
         repo_lookup[str(cargo_path)] = repo_id
         repo_id += 1
