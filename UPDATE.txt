@@ -1,0 +1,50 @@
+
+#> First do quick scan of $RUST_REPO_ROOT
+#> Find the Cargo.tmol file and basic project name and path info and give them each an id
+#> Keep a record of unique package version (give them an id) and which project repos they map to, especially hub
+#> For every new package keep track of them to get their latest versions later. 
+
+GET REPO INFORMATION
+
+#------ SECTION : REPO LIST --------#
+REPO LIST
+COLUMNS: > 
+	REPO_ID - 100 (inc)
+	REPO_NAME - name of repo from TOML file (not folder name)
+	PATH - relative path from $RUST_REPO_ROOT
+	PARENT - apprent repo name from project folder (or parent folder of Cargo.toml)
+	LAST_UPDATE - epoch (git stat?)
+	CARGO_VERSION - version from Cargo.toml
+
+
+GET REPO DEPENDENCY INFORMATION 
+
+#------ SECTION : DEP VERSIONS LIST --------#	
+DEPS VERSIONS LIST (per REPO)
+COLUMNS : >
+  DEP_ID - (UNIQUE PER VERSION)
+  REPO_ID (ref)
+  REPO_NAME (convenience for visibility)
+  REPO_VERSION (repos version of this module)
+  FEATURES - (features used by the repo, or NONE)
+
+
+GET CANONICAL LATEST
+
+#------ SECTION : DEP LATEST LIST --------#	
+LATEST LIST
+COLUMNS : >
+  PKG_ID  - 100 (inc)
+  PKG_NAME
+  LATEST_VERSION
+
+
+#------ SECTION : VERSION MAP LIST --------#	
+VERSION MAP LIST
+COLUMNS : >
+  MAP_ID 
+  DEP_ID (ref)
+  PKG_ID (ref)
+  REPO_ID (ref)
+  STATE (unstable, pre-release, experimental, beta, other meta label)
+  BREAKING (safe, current BREAKING major, BREAKING minor )

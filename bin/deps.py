@@ -68,7 +68,7 @@ class Colors:
     ORANGE = '\x1B[38;5;214m' # orange - warnings/attention
     AMBER = '\x1B[38;5;220m'  # amber - golden orange
     EMERALD = '\x1B[38;5;34m' # emerald - pure green for success
-    CRIMSON = '\x1B[38;5;196m' # crimson - pure red for errors
+    CRIMSON = '\x1B[38;5;196m' # crimson - pure red for critical errors
 
     # Style modifiers
     BOLD = '\x1B[1m'
@@ -225,6 +225,43 @@ def parse_version(ver_str):
         return version.parse(ver_str)
     except:
         return None
+
+def is_breaking_change(from_version, to_version):
+    """Check if version change represents a breaking change according to Rust SemVer"""
+    if not from_version or not to_version:
+        return False
+
+    from_ver = parse_version(from_version) if isinstance(from_version, str) else from_version
+    to_ver = parse_version(to_version) if isinstance(to_version, str) else to_version
+
+    if not from_ver or not to_ver:
+        return False
+
+    # Major version bump is always breaking
+    if to_ver.major > from_ver.major:
+        return True
+
+    # For 0.x versions, minor bump is potentially breaking
+    if from_ver.major == 0 and to_ver.minor > from_ver.minor:
+        return True
+
+    return False
+
+def get_version_risk(ver):
+    """Get risk level for a version"""
+    parsed = parse_version(ver) if isinstance(ver, str) else ver
+    if not parsed:
+        return "unknown", Colors.GRAY
+
+    # Pre-release versions
+    if parsed.is_prerelease:
+        return "pre-release", Colors.YELLOW
+
+    # 0.x versions are inherently unstable
+    if parsed.major == 0:
+        return "unstable", Colors.ORANGE
+
+    return "stable", Colors.GREEN
 
 def get_latest_version(package_name):
     """Get latest version from crates.io"""
@@ -417,29 +454,55 @@ def format_version_analysis(dependencies):
         min_version = min(sorted_versions) if sorted_versions else None
         max_version = max(sorted_versions) if sorted_versions else None
 
-        # Header with latest version
-        conflict_indicator = f"{Colors.RED}⚠️" if has_conflict else f"{Colors.GREEN}✅"
+        # Check for breaking changes in this dependency
+        has_breaking = False
+        if latest_version and len(versions) > 1:
+            has_breaking = is_breaking_change(str(min_version), latest_version)
+        elif latest_version and len(versions) == 1:
+            has_breaking = is_breaking_change(str(max_version), latest_version)
+
+        # Header with breaking change indicators
+        if has_conflict and has_breaking:
+            conflict_indicator = f"{Colors.CRIMSON}⚠️ BREAKING CONFLICT"
+        elif has_conflict:
+            conflict_indicator = f"{Colors.RED}⚠️ CONFLICT"
+        elif latest_version and has_breaking:
+            conflict_indicator = f"{Colors.ORANGE}⚠️ BREAKING UPDATE"
+        else:
+            conflict_indicator = f"{Colors.GREEN}✅"
+
         latest_str = f" (latest: {Colors.CYAN}{latest_version}{Colors.END})" if latest_version else ""
-        print(f"{conflict_indicator} {Colors.BOLD}{dep_name}{Colors.END}{latest_str} {f'({len(versions)} versions)' if has_conflict else ''}")
+        version_info = f" ({len(versions)} versions)" if has_conflict else ""
+        print(f"{conflict_indicator} {Colors.BOLD}{dep_name}{Colors.END}{latest_str}{version_info}")
 
         # Show versions in columns
         for ver in sorted_versions:
-            # Color coding: red for lowest, green for highest, yellow for middle
+            # Color coding with version risk assessment
+            risk_level, risk_color = get_version_risk(ver)
+
             if len(sorted_versions) > 1:
                 if ver == min_version:
-                    ver_color = Colors.RED
+                    ver_color = Colors.RED  # Oldest version
                 elif ver == max_version:
-                    ver_color = Colors.GREEN
+                    ver_color = Colors.GREEN  # Newest version
                 else:
-                    ver_color = Colors.YELLOW
+                    ver_color = Colors.YELLOW  # Middle version
             else:
-                ver_color = Colors.WHITE
+                ver_color = risk_color  # Single version - show risk level
 
             projects_with_version = version_map[ver]
             projects_str = ', '.join([f"{proj}({typ})" if typ == 'dev' else proj
                                     for proj, typ in projects_with_version])
 
-            print(f"  {ver_color}{str(ver):<12}{Colors.END} → {projects_str}")
+            # Add risk indicator for unstable/pre-release versions
+            risk_level, _ = get_version_risk(ver)
+            risk_indicator = ""
+            if risk_level == "unstable":
+                risk_indicator = f" {Colors.YELLOW}◐{Colors.END}"  # 0.x indicator
+            elif risk_level == "pre-release":
+                risk_indicator = f" {Colors.YELLOW}◑{Colors.END}"  # pre-release indicator
+
+            print(f"  {ver_color}{str(ver):<12}{Colors.END}{risk_indicator} → {projects_str}")
 
         print()
 
@@ -450,8 +513,34 @@ def format_version_analysis(dependencies):
     print(f"Dependencies with version conflicts: {Colors.RED}{Colors.BOLD}{conflicts_found}{Colors.END}")
     print(f"Clean dependencies (single version): {Colors.GREEN}{Colors.BOLD}{len(sorted_deps) - conflicts_found}{Colors.END}")
 
-    if conflicts_found > 0:
-        print(f"\n{Colors.RED}{Colors.BOLD}🚨 Hub integration will resolve {conflicts_found} version conflicts!{Colors.END}")
+    # Count breaking change issues
+    breaking_conflicts = 0
+    breaking_updates = 0
+    for dep_name, usages in sorted_deps:
+        versions = set()
+        for parent_repo, ver_str, dep_type, cargo_path in usages:
+            parsed_ver = parse_version(ver_str)
+            if parsed_ver:
+                versions.add(parsed_ver)
+
+        if versions:
+            min_version = min(versions)
+            max_version = max(versions)
+            latest_version = latest_cache.get(dep_name)
+
+            if len(versions) > 1 and latest_version:
+                if is_breaking_change(str(min_version), latest_version):
+                    breaking_conflicts += 1
+            elif len(versions) == 1 and latest_version:
+                if is_breaking_change(str(max_version), latest_version):
+                    breaking_updates += 1
+
+    if conflicts_found > 0 or breaking_conflicts > 0 or breaking_updates > 0:
+        print(f"\n{Colors.RED}{Colors.BOLD}🚨 Hub integration will resolve {conflicts_found} conflicts!{Colors.END}")
+        if breaking_conflicts > 0:
+            print(f"{Colors.CRIMSON}{Colors.BOLD}⚠️  {breaking_conflicts} dependencies have BREAKING CHANGE conflicts{Colors.END}")
+        if breaking_updates > 0:
+            print(f"{Colors.ORANGE}{Colors.BOLD}⚠️  {breaking_updates} dependencies have breaking updates available{Colors.END}")
     else:
         print(f"\n{Colors.GREEN}{Colors.BOLD}✨ No version conflicts detected - ecosystem is clean!{Colors.END}")
 
@@ -552,8 +641,8 @@ def detailed_review(dependencies):
     sorted_deps = sorted(filtered_deps.items(), key=sort_key)
 
     # Header
-    print(f"{Colors.WHITE}{Colors.BOLD}{'Package':<20} {'#U':<4} {'Ecosystem':<14} {'Latest'}{Colors.END}")
-    print(f"{Colors.GRAY}{'-' * 80}{Colors.END}")
+    print(f"{Colors.WHITE}{Colors.BOLD}{'Package':<20} {'#U':<4} {'Ecosystem':<14} {'Latest':<20} {'Breaking'}{Colors.END}")
+    print(f"{Colors.GRAY}{'-' * 105}{Colors.END}")
 
     for dep_name, usages in sorted_deps:
         # Get versions used in ecosystem
@@ -582,16 +671,53 @@ def detailed_review(dependencies):
         has_conflict = len(versions) > 1
         latest_str = latest_version if latest_version else "unknown"
 
-        # Determine block color for ecosystem version
+        # Check for breaking changes
+        has_breaking = False
+        if latest_version and has_conflict:
+            # Check if update from min to latest would be breaking
+            has_breaking = is_breaking_change(str(min_version), latest_version)
+
+        # Get version risk for ecosystem version
+        risk_level, risk_color = get_version_risk(max_version)
+
+        # Determine block color for ecosystem version (simplified - breaking info in separate column)
         if has_conflict:
-            status_block = f"{Colors.RED}■{Colors.END}"
+            status_block = f"{Colors.RED}■{Colors.END}"  # Conflict
         elif latest_version and parse_version(latest_version) and parse_version(latest_version) > max_version:
-            status_block = f"{Colors.ORANGE}■{Colors.END}"
+            status_block = f"{Colors.ORANGE}■{Colors.END}"  # Update available
+        elif risk_level == "unstable":
+            status_block = f"{Colors.YELLOW}◐{Colors.END}"  # 0.x version
+        elif risk_level == "pre-release":
+            status_block = f"{Colors.YELLOW}◑{Colors.END}"  # Pre-release
         else:
-            status_block = f"{Colors.GRAY}■{Colors.END}"
+            status_block = f"{Colors.GRAY}■{Colors.END}"  # Stable and current
 
         # Count repos using this dependency
         repo_count = len(set(parent_repo for parent_repo, _, _, _ in usages))
+
+        # Check for breaking changes
+        breaking_status = ""
+        if latest_version and latest_str != "unknown":
+            if has_conflict:
+                # Check if update from min to latest would be breaking
+                if is_breaking_change(str(min_version), latest_version):
+                    breaking_status = f"{Colors.CRIMSON}BREAKING{Colors.END}"
+                else:
+                    breaking_status = f"{Colors.GREEN}safe{Colors.END}"
+            else:
+                # Single version - check if update would be breaking
+                if is_breaking_change(str(max_version), latest_version):
+                    if parse_version(latest_version) > max_version:
+                        breaking_status = f"{Colors.ORANGE}BREAKING{Colors.END}"
+                    else:
+                        breaking_status = f"{Colors.GRAY}current{Colors.END}"
+                else:
+                    if parse_version(latest_version) > max_version:
+                        breaking_status = f"{Colors.GREEN}safe{Colors.END}"
+                    else:
+                        breaking_status = f"{Colors.GRAY}current{Colors.END}"
+        else:
+            breaking_status = f"{Colors.GRAY}unknown{Colors.END}"
 
         # Smart version coloring - only highlight differences
         # Compare parsed versions to handle "0.9" vs "0.9.0" properly
@@ -602,7 +728,7 @@ def detailed_review(dependencies):
         if versions_match:
             # Versions match - keep latest gray, but eco still gets block
             eco_with_block = f"{status_block} {Colors.GRAY}{ecosystem_version:<12}{Colors.END}"
-            latest_colored = f"{Colors.GRAY}{latest_str}{Colors.END}"
+            latest_colored = f"{Colors.GRAY}{latest_str:<18}{Colors.END}"
         else:
             # Versions differ - color ecosystem by status, latest in blue
             if has_conflict:
@@ -612,18 +738,24 @@ def detailed_review(dependencies):
             else:
                 eco_with_block = f"{status_block} {Colors.GRAY}{ecosystem_version:<12}{Colors.END}"
 
-            latest_colored = f"{Colors.CYAN}{latest_str}{Colors.END}"
+            latest_colored = f"{Colors.CYAN}{latest_str:<18}{Colors.END}"
 
-        # Print gray row with block in front of ecosystem version
+        # Print gray row with block in front of ecosystem version and breaking status
         print(f"{Colors.GRAY}{dep_name:<20} "
               f"{repo_count:<4} "
               f"{Colors.END}{eco_with_block} "
-              f"{latest_colored}")
+              f"{latest_colored} "
+              f"{breaking_status}")
 
     print(f"\n{Colors.PURPLE}{Colors.BOLD}Legend:{Colors.END}")
-    print(f"{Colors.GRAY}■{Colors.END} UPDATED   - Using latest version, no conflicts in ecosystem")
-    print(f"{Colors.ORANGE}■{Colors.END} OUTDATED  - Newer version available on crates.io")
+    print(f"{Colors.GRAY}■{Colors.END} UPDATED   - Using latest version, no conflicts")
+    print(f"{Colors.ORANGE}■{Colors.END} OUTDATED  - Newer version available (safe update)")
+    print(f"{Colors.ORANGE}⚠{Colors.END} BREAKING  - Breaking change update available")
     print(f"{Colors.RED}■{Colors.END} CONFLICT  - Multiple versions in ecosystem")
+    print(f"{Colors.CRIMSON}⚠{Colors.END} CRITICAL  - Breaking change conflicts")
+    print(f"{Colors.YELLOW}◐{Colors.END} UNSTABLE  - 0.x version (minor bumps can break)")
+    print(f"{Colors.YELLOW}◑{Colors.END} PREREL    - Pre-release version")
+    print(f"\nBreaking: {Colors.CRIMSON}BREAKING{Colors.END} (conflicts), {Colors.ORANGE}BREAKING{Colors.END} (updates), {Colors.GREEN}safe{Colors.END}, {Colors.GRAY}current{Colors.END}")
     print(f"Versions: Only colored when {Colors.ORANGE}ecosystem{Colors.END} ≠ {Colors.CYAN}latest{Colors.END}")
 
 def analyze_package(dependencies, package_name):
@@ -1139,7 +1271,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Rust dependency analyzer with enhanced commands")
     parser.add_argument('command', nargs='?', default='analyze',
-                       choices=['analyze', 'query', 'q', 'all', 'export', 'review', 'pkg', 'latest', 'hub'],
+                       choices=['analyze', 'query', 'q', 'all', 'export', 'eco', 'review', 'pkg', 'latest', 'hub'],
                        help='Command to run')
     parser.add_argument('package', nargs='?', help='Package name for pkg/latest commands')
 
@@ -1159,6 +1291,8 @@ def main():
 
         if args.command == 'export':
             export_raw_data(dependencies)
+        elif args.command == 'eco':
+            detailed_review(dependencies)
         elif args.command == 'review':
             detailed_review(dependencies)
         elif args.command == 'pkg':
