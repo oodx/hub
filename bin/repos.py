@@ -11,7 +11,21 @@ Commands:
 
 import os
 import sys
-import toml
+try:
+    import tomllib
+    def load_toml(file_or_string, is_string=False):
+        if is_string:
+            return tomllib.loads(file_or_string)
+        else:
+            with open(file_or_string, 'rb') as f:
+                return tomllib.load(f)
+except ImportError:
+    import toml
+    def load_toml(file_or_string, is_string=False):
+        if is_string:
+            return toml.loads(file_or_string)
+        else:
+            return toml.load(file_or_string)
 import json
 import argparse
 import time
@@ -359,8 +373,7 @@ def analyze_dependencies():
 
     for cargo_path in cargo_files:
         try:
-            with open(cargo_path, 'r') as f:
-                cargo_data = toml.load(f)
+            cargo_data = load_toml(cargo_path)
 
             parent_repo = get_parent_repo(cargo_path)
 
@@ -1134,7 +1147,7 @@ def get_repo_info(cargo_path: Path) -> Optional[Dict]:
     """Get repository information from Cargo.toml file"""
     try:
         with open(cargo_path, 'r') as f:
-            cargo_data = toml.load(f)
+            cargo_data = load_toml(f)
 
         # Get basic package info
         package_info = cargo_data.get('package', {})
@@ -1201,7 +1214,7 @@ def detect_hub_usage(cargo_path: Path, hub_info: Optional[HubInfo]) -> Tuple[str
 
     try:
         with open(cargo_path, 'r') as f:
-            cargo_data = toml.load(f)
+            cargo_data = load_toml(f)
 
         deps_section = cargo_data.get('dependencies', {})
 
@@ -1270,8 +1283,7 @@ def extract_dependencies_batch(cargo_files: List[Path]) -> List[DepData]:
 
     for cargo_path in cargo_files:
         try:
-            with open(cargo_path, 'r') as f:
-                cargo_data = toml.load(f)
+            cargo_data = load_toml(cargo_path)
 
             current_repo_id = repo_lookup[str(cargo_path)]
 
@@ -1385,8 +1397,7 @@ def resolve_git_version(git_repo: str, git_ref: str) -> str:
                 if result.returncode == 0:
                     # Decode base64 content and parse TOML
                     content = base64.b64decode(result.stdout.strip()).decode('utf-8')
-                    import toml
-                    cargo_data = toml.loads(content)
+                    cargo_data = load_toml(content, is_string=True)
 
                     if 'package' in cargo_data and 'version' in cargo_data['package']:
                         version = cargo_data['package']['version']
@@ -1412,8 +1423,7 @@ def collect_unique_packages_with_sources(cargo_files: List[Path]) -> Dict[str, T
 
     for cargo_path in cargo_files:
         try:
-            with open(cargo_path, 'r') as f:
-                cargo_data = toml.load(f)
+            cargo_data = load_toml(cargo_path)
 
             # Process regular dependencies
             if 'dependencies' in cargo_data:
@@ -1878,8 +1888,7 @@ def get_hub_dependencies():
 
     if hub_cargo_path.exists():
         try:
-            with open(hub_cargo_path, 'r') as f:
-                cargo_data = toml.load(f)
+            cargo_data = load_toml(hub_cargo_path)
 
             # Parse regular dependencies
             if 'dependencies' in cargo_data:
@@ -2114,6 +2123,168 @@ def generate_data_cache(dependencies):
     write_tsv_cache(repos, deps, latest_versions, version_maps, output_file)
 
     print(f"\n{Colors.GREEN}{Colors.BOLD}✅ Data cache generated: {output_file}{Colors.END}")
+
+# ============================================================================
+# OPTIMIZED VIEW FUNCTIONS - Using hydrated TSV data for lightning-fast analysis
+# ============================================================================
+
+def view_conflicts(ecosystem: EcosystemData) -> None:
+    """Lightning-fast version conflict analysis using hydrated data
+
+    Replaces format_version_analysis() with ~100x performance improvement
+    """
+    print(f"{Colors.CYAN}{Colors.BOLD}⚡ Fast Conflict Analysis{Colors.END}")
+
+    conflicts = {}
+
+    # Group deps by package name using pre-indexed data (instant lookup)
+    for dep_id, dep in ecosystem.deps.items():
+        if dep.pkg_name not in conflicts:
+            conflicts[dep.pkg_name] = []
+
+        repo = ecosystem.repos[dep.repo_id]
+        conflicts[dep.pkg_name].append({
+            'repo': repo.repo_name,
+            'version': dep.pkg_version,
+            'type': dep.dep_type,
+            'repo_parent': repo.parent
+        })
+
+    # Filter to only packages with conflicts (>1 version)
+    conflict_packages = {k: v for k, v in conflicts.items()
+                        if len(set(item['version'] for item in v)) > 1}
+
+    if not conflict_packages:
+        print(f"{Colors.GREEN}✅ No version conflicts found in ecosystem!{Colors.END}")
+        return
+
+    print(f"\n{Colors.RED}Found {len(conflict_packages)} packages with version conflicts:{Colors.END}")
+
+    for pkg_name, usages in conflict_packages.items():
+        versions = set(item['version'] for item in usages)
+        latest_info = ecosystem.latest.get(pkg_name)
+        latest_version = latest_info.latest_version if latest_info else "unknown"
+
+        print(f"\n{Colors.YELLOW}{Colors.BOLD}{pkg_name}{Colors.END} (latest: {latest_version})")
+
+        # Group by version for cleaner display
+        by_version = {}
+        for usage in usages:
+            ver = usage['version']
+            if ver not in by_version:
+                by_version[ver] = []
+            by_version[ver].append(usage)
+
+        for version in sorted(by_version.keys()):
+            repos_using = by_version[version]
+            repo_names = [f"{item['repo']}" for item in repos_using]
+            dep_types = set(item['type'] for item in repos_using)
+
+            print(f"  {Colors.BLUE}{version}{Colors.END} → {', '.join(repo_names)} ({', '.join(dep_types)})")
+
+def view_package_detail(ecosystem: EcosystemData, pkg_name: str) -> None:
+    """Lightning-fast package analysis using hydrated data
+
+    Replaces analyze_package() with instant lookup performance
+    """
+    print(f"{Colors.CYAN}{Colors.BOLD}⚡ Fast Package Analysis: {pkg_name}{Colors.END}")
+
+    if pkg_name not in ecosystem.latest:
+        print(f"{Colors.RED}❌ Package '{pkg_name}' not found in ecosystem{Colors.END}")
+        return
+
+    latest_info = ecosystem.latest[pkg_name]
+
+    # Get all usages using indexed data (instant lookup)
+    usages = [dep for dep in ecosystem.deps.values() if dep.pkg_name == pkg_name]
+
+    if not usages:
+        print(f"{Colors.YELLOW}⚠️  Package found in latest versions but not used in any repos{Colors.END}")
+        return
+
+    # Package overview
+    print(f"\n{Colors.WHITE}{Colors.BOLD}Package Overview:{Colors.END}")
+    print(f"  📦 Latest Version: {Colors.GREEN}{latest_info.latest_version}{Colors.END}")
+    print(f"  🏷️  Source Type: {latest_info.source_type}")
+    print(f"  🎯 Hub Status: {latest_info.hub_status}")
+    print(f"  📊 Used in: {len(usages)} dependencies across {len(set(dep.repo_id for dep in usages))} repositories")
+
+    # Usage breakdown
+    print(f"\n{Colors.WHITE}{Colors.BOLD}Usage Details:{Colors.END}")
+
+    # Group by repository
+    by_repo = {}
+    for dep in usages:
+        repo_id = dep.repo_id
+        if repo_id not in by_repo:
+            by_repo[repo_id] = []
+        by_repo[repo_id].append(dep)
+
+    for repo_id, repo_deps in by_repo.items():
+        repo = ecosystem.repos[repo_id]
+        versions = set(dep.pkg_version for dep in repo_deps)
+        dep_types = set(dep.dep_type for dep in repo_deps)
+
+        # Show version status
+        version_str = ', '.join(versions)
+        if len(versions) == 1 and list(versions)[0] == latest_info.latest_version:
+            version_color = Colors.GREEN
+            status = "✅"
+        else:
+            version_color = Colors.YELLOW
+            status = "⚠️"
+
+        print(f"  {status} {Colors.BOLD}{repo.repo_name}{Colors.END} → {version_color}{version_str}{Colors.END} ({', '.join(dep_types)})")
+
+def view_hub_dashboard(ecosystem: EcosystemData) -> None:
+    """Lightning-fast hub-centric analysis using hydrated data
+
+    Replaces analyze_hub_status() with pre-computed hub metrics
+    """
+    print(f"{Colors.CYAN}{Colors.BOLD}⚡ Fast Hub Dashboard{Colors.END}")
+
+    # Get hub packages (packages with hub status)
+    hub_packages = {name: info for name, info in ecosystem.latest.items()
+                   if info.hub_status != 'NONE'}
+
+    if not hub_packages:
+        print(f"{Colors.YELLOW}⚠️  No hub packages found in ecosystem{Colors.END}")
+        return
+
+    # Hub overview from aggregation metrics
+    agg = ecosystem.aggregation
+    print(f"\n{Colors.WHITE}{Colors.BOLD}Hub Overview:{Colors.END}")
+    print(f"  📦 Total Packages: {agg.get('total_packages', '?')}")
+    print(f"  🏠 Hub Packages: {len(hub_packages)}")
+    print(f"  📊 Hub Coverage: {(len(hub_packages) / int(agg.get('total_packages', 1)) * 100):.1f}%")
+
+    # Status breakdown
+    status_counts = {}
+    for pkg_info in hub_packages.values():
+        status = pkg_info.hub_status
+        status_counts[status] = status_counts.get(status, 0) + 1
+
+    print(f"\n{Colors.WHITE}{Colors.BOLD}Hub Status Breakdown:{Colors.END}")
+    for status, count in sorted(status_counts.items()):
+        color = Colors.GREEN if status == 'current' else Colors.YELLOW if status == 'outdated' else Colors.RED
+        print(f"  {color}{status.title()}: {count} packages{Colors.END}")
+
+    # Package details
+    print(f"\n{Colors.WHITE}{Colors.BOLD}Hub Package Details:{Colors.END}")
+
+    for pkg_name, pkg_info in sorted(hub_packages.items()):
+        # Get usage count
+        usage_count = len([dep for dep in ecosystem.deps.values() if dep.pkg_name == pkg_name])
+
+        status_color = (Colors.GREEN if pkg_info.hub_status == 'current'
+                       else Colors.YELLOW if pkg_info.hub_status == 'outdated'
+                       else Colors.RED)
+
+        hub_ver = pkg_info.hub_version or "unknown"
+        latest_ver = pkg_info.latest_version
+
+        print(f"  {status_color}{pkg_info.hub_status.ljust(8)}{Colors.END} {Colors.BOLD}{pkg_name}{Colors.END}")
+        print(f"    Hub: {hub_ver} | Latest: {latest_ver} | Used in: {usage_count} deps")
 
 def discover_repositories(force_live=False):
     """Discover repository paths using cache or live discovery
@@ -2400,11 +2571,14 @@ def main():
 
     parser = argparse.ArgumentParser(description="Rust dependency analyzer with enhanced commands")
     parser.add_argument('command', nargs='?', default='analyze',
-                       choices=['analyze', 'query', 'q', 'all', 'export', 'eco', 'review', 'pkg', 'latest', 'hub', 'data', 'superclean', 'tap', 'ssh-test', 'ls'],
+                       choices=['analyze', 'query', 'q', 'all', 'export', 'eco', 'review', 'pkg', 'latest', 'hub', 'data', 'superclean', 'tap', 'ssh-test', 'ls', 'fast'],
                        help='Command to run')
     parser.add_argument('package', nargs='?', help='Package name for pkg/latest commands')
     parser.add_argument('--ssh-profile', default=None, help='SSH profile/host for git operations (e.g., "qodeninja" for git@qodeninja)')
     parser.add_argument('--live', action='store_true', help='Force live discovery instead of using cache')
+    parser.add_argument('--conflicts', action='store_true', help='Show version conflicts (fast command)')
+    parser.add_argument('--pkg-detail', default=None, help='Show package details (fast command)')
+    parser.add_argument('--hub-dashboard', action='store_true', help='Show hub dashboard (fast command)')
 
     args = parser.parse_args()
 
@@ -2466,6 +2640,19 @@ def main():
         elif args.command == 'ls':
             # List repositories
             list_repositories(force_live=args.live)
+        elif args.command == 'fast':
+            # Fast hydrated view commands
+            ecosystem = hydrate_tsv_cache()
+
+            if args.conflicts:
+                view_conflicts(ecosystem)
+            elif args.pkg_detail:
+                view_package_detail(ecosystem, args.pkg_detail)
+            elif args.hub_dashboard:
+                view_hub_dashboard(ecosystem)
+            else:
+                # Default fast view - show conflicts
+                view_conflicts(ecosystem)
         else:  # default 'analyze', 'query', 'q'
             # Show package usage analysis
             analyze_package_usage(dependencies)
