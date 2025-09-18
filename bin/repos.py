@@ -1146,8 +1146,7 @@ def find_all_cargo_files_fast() -> List[Path]:
 def get_repo_info(cargo_path: Path) -> Optional[Dict]:
     """Get repository information from Cargo.toml file"""
     try:
-        with open(cargo_path, 'r') as f:
-            cargo_data = load_toml(f)
+        cargo_data = load_toml(cargo_path)
 
         # Get basic package info
         package_info = cargo_data.get('package', {})
@@ -1213,8 +1212,7 @@ def detect_hub_usage(cargo_path: Path, hub_info: Optional[HubInfo]) -> Tuple[str
         return "NONE", "none"
 
     try:
-        with open(cargo_path, 'r') as f:
-            cargo_data = load_toml(f)
+        cargo_data = load_toml(cargo_path)
 
         deps_section = cargo_data.get('dependencies', {})
 
@@ -2642,17 +2640,24 @@ def main():
             list_repositories(force_live=args.live)
         elif args.command == 'fast':
             # Fast hydrated view commands
-            ecosystem = hydrate_tsv_cache()
+            try:
+                ecosystem = hydrate_tsv_cache()
+                print(f"✅ Hydration successful: {len(ecosystem.deps)} deps, {len(ecosystem.repos)} repos")
 
-            if args.conflicts:
-                view_conflicts(ecosystem)
-            elif args.pkg_detail:
-                view_package_detail(ecosystem, args.pkg_detail)
-            elif args.hub_dashboard:
-                view_hub_dashboard(ecosystem)
-            else:
-                # Default fast view - show conflicts
-                view_conflicts(ecosystem)
+                if args.conflicts:
+                    view_conflicts(ecosystem)
+                elif args.pkg_detail:
+                    view_package_detail(ecosystem, args.pkg_detail)
+                elif args.hub_dashboard:
+                    view_hub_dashboard(ecosystem)
+                else:
+                    # Default fast view - show conflicts
+                    view_conflicts(ecosystem)
+            except Exception as e:
+                print(f"❌ Error in fast command: {e}")
+                import traceback
+                traceback.print_exc()
+                return
         else:  # default 'analyze', 'query', 'q'
             # Show package usage analysis
             analyze_package_usage(dependencies)
