@@ -1597,6 +1597,56 @@ def get_version_stability(version_str: str) -> str:
 def write_tsv_cache(repos: List[RepoData], deps: List[DepData], latest_versions: Dict[str, LatestData], version_maps: List[VersionMapData], output_file: str):
     """Write structured TSV cache file"""
     with open(output_file, 'w') as f:
+        # Section 0: AGGREGATION METRICS
+        f.write("#------ SECTION : AGGREGATION METRICS --------#\n")
+        f.write("KEY\tVALUE\n")
+
+        # Repository metrics
+        f.write(f"total_repos\t{len(repos)}\n")
+        hub_using_repos = len([r for r in repos if r.hub_status in ['using', 'path']])
+        f.write(f"hub_using_repos\t{hub_using_repos}\n")
+
+        # Dependency metrics
+        f.write(f"total_deps\t{len(deps)}\n")
+        f.write(f"total_packages\t{len(latest_versions)}\n")
+
+        # Package source breakdown
+        git_packages = len([p for p in latest_versions.values() if p.source_type == 'git'])
+        local_packages = len([p for p in latest_versions.values() if p.source_type == 'local'])
+        crate_packages = len([p for p in latest_versions.values() if p.source_type == 'crate'])
+        workspace_packages = len([p for p in latest_versions.values() if p.source_type == 'workspace'])
+        f.write(f"git_packages\t{git_packages}\n")
+        f.write(f"local_packages\t{local_packages}\n")
+        f.write(f"crate_packages\t{crate_packages}\n")
+        f.write(f"workspace_packages\t{workspace_packages}\n")
+
+        # Hub status breakdown
+        current_packages = len([p for p in latest_versions.values() if p.hub_status == 'current'])
+        outdated_packages = len([p for p in latest_versions.values() if p.hub_status == 'outdated'])
+        gap_packages = len([p for p in latest_versions.values() if p.hub_status == 'gap'])
+        local_hub_packages = len([p for p in latest_versions.values() if p.hub_status == 'local'])
+        f.write(f"hub_current\t{current_packages}\n")
+        f.write(f"hub_outdated\t{outdated_packages}\n")
+        f.write(f"hub_gap\t{gap_packages}\n")
+        f.write(f"hub_local\t{local_hub_packages}\n")
+
+        # Breaking change analysis
+        breaking_deps = len([v for v in version_maps if v.breaking_type == 'BREAKING'])
+        safe_deps = len([v for v in version_maps if v.breaking_type == 'safe'])
+        unknown_deps = len([v for v in version_maps if v.breaking_type == 'unknown'])
+        f.write(f"breaking_updates\t{breaking_deps}\n")
+        f.write(f"safe_updates\t{safe_deps}\n")
+        f.write(f"unknown_updates\t{unknown_deps}\n")
+
+        # Version state analysis
+        stable_deps = len([v for v in version_maps if v.version_state == 'stable'])
+        unstable_deps = len([v for v in version_maps if v.version_state == 'unstable'])
+        f.write(f"stable_versions\t{stable_deps}\n")
+        f.write(f"unstable_versions\t{unstable_deps}\n")
+
+        f.write("\n")
+
+    with open(output_file, 'a') as f:
         # Section 1: REPO LIST
         f.write("#------ SECTION : REPO LIST --------#\n")
         f.write("REPO_ID\tREPO_NAME\tPATH\tPARENT\tLAST_UPDATE\tCARGO_VERSION\tHUB_USAGE\tHUB_STATUS\n")
@@ -1623,6 +1673,203 @@ def write_tsv_cache(repos: List[RepoData], deps: List[DepData], latest_versions:
         f.write("MAP_ID\tDEP_ID\tPKG_ID\tREPO_ID\tVERSION_STATE\tBREAKING_TYPE\tECOSYSTEM_STATUS\n")
         for vm in version_maps:
             f.write(f"{vm.map_id}\t{vm.dep_id}\t{vm.pkg_id}\t{vm.repo_id}\t{vm.version_state}\t{vm.breaking_type}\t{vm.ecosystem_status}\n")
+
+# === TSV HYDRATION FUNCTIONS ===
+
+@dataclass
+class EcosystemData:
+    """Hydrated ecosystem data from TSV cache"""
+    aggregation: Dict[str, str]
+    repos: Dict[int, RepoData]
+    deps: Dict[int, DepData]
+    latest: Dict[str, LatestData]  # keyed by pkg_name
+    version_maps: Dict[int, VersionMapData]
+
+def hydrate_tsv_cache(cache_file: str = "deps_cache.tsv") -> EcosystemData:
+    """Load and parse structured TSV cache into organized data structures"""
+    if not Path(cache_file).exists():
+        raise FileNotFoundError(f"Cache file {cache_file} not found. Run './bin/deps.py data' to generate it.")
+
+    aggregation = {}
+    repos = {}
+    deps = {}
+    latest = {}
+    version_maps = {}
+
+    current_section = None
+
+    with open(cache_file, 'r') as f:
+        for line_num, line in enumerate(f, 1):
+            line = line.strip()
+
+            # Skip empty lines
+            if not line:
+                continue
+
+            # Section headers
+            if line.startswith("#------ SECTION :"):
+                if "AGGREGATION METRICS" in line:
+                    current_section = "aggregation"
+                elif "REPO LIST" in line:
+                    current_section = "repos"
+                elif "DEP VERSIONS LIST" in line:
+                    current_section = "deps"
+                elif "DEP LATEST LIST" in line:
+                    current_section = "latest"
+                elif "VERSION MAP LIST" in line:
+                    current_section = "version_maps"
+                continue
+
+            # Skip header rows
+            if "\t" in line and (line.startswith("KEY\t") or line.startswith("REPO_ID\t") or
+                                line.startswith("DEP_ID\t") or line.startswith("PKG_ID\t") or
+                                line.startswith("MAP_ID\t")):
+                continue
+
+            # Parse data rows
+            parts = line.split("\t")
+
+            try:
+                if current_section == "aggregation" and len(parts) >= 2:
+                    key, value = parts[0], parts[1]
+                    aggregation[key] = value
+
+                elif current_section == "repos" and len(parts) >= 8:
+                    repo = RepoData(
+                        repo_id=int(parts[0]),
+                        repo_name=parts[1],
+                        path=parts[2],
+                        parent=parts[3],
+                        last_update=int(parts[4]),
+                        cargo_version=parts[5],
+                        hub_usage=parts[6],
+                        hub_status=parts[7]
+                    )
+                    repos[repo.repo_id] = repo
+
+                elif current_section == "deps" and len(parts) >= 6:
+                    dep = DepData(
+                        dep_id=int(parts[0]),
+                        repo_id=int(parts[1]),
+                        pkg_name=parts[2],
+                        pkg_version=parts[3],
+                        dep_type=parts[4],
+                        features=parts[5]
+                    )
+                    deps[dep.dep_id] = dep
+
+                elif current_section == "latest" and len(parts) >= 7:
+                    latest_data = LatestData(
+                        pkg_id=int(parts[0]),
+                        pkg_name=parts[1],
+                        latest_version=parts[2],
+                        source_type=parts[3],
+                        source_value=parts[4],
+                        hub_version=parts[5],
+                        hub_status=parts[6]
+                    )
+                    latest[latest_data.pkg_name] = latest_data
+
+                elif current_section == "version_maps" and len(parts) >= 7:
+                    vm = VersionMapData(
+                        map_id=int(parts[0]),
+                        dep_id=int(parts[1]),
+                        pkg_id=int(parts[2]),
+                        repo_id=int(parts[3]),
+                        version_state=parts[4],
+                        breaking_type=parts[5],
+                        ecosystem_status=parts[6]
+                    )
+                    version_maps[vm.map_id] = vm
+
+            except (ValueError, IndexError) as e:
+                print(f"{Colors.YELLOW}⚠️  Skipping malformed line {line_num}: {line[:50]}... ({e}){Colors.END}")
+                continue
+
+    return EcosystemData(
+        aggregation=aggregation,
+        repos=repos,
+        deps=deps,
+        latest=latest,
+        version_maps=version_maps
+    )
+
+# === VIEW HELPER FUNCTIONS ===
+
+def get_package_usage_count(ecosystem: EcosystemData, pkg_name: str) -> int:
+    """Get count of repositories using a specific package"""
+    return len([dep for dep in ecosystem.deps.values() if dep.pkg_name == pkg_name])
+
+def get_packages_by_usage(ecosystem: EcosystemData) -> List[Tuple[str, int]]:
+    """Get packages sorted by usage count (descending)"""
+    usage_counts = {}
+    for dep in ecosystem.deps.values():
+        usage_counts[dep.pkg_name] = usage_counts.get(dep.pkg_name, 0) + 1
+
+    return sorted(usage_counts.items(), key=lambda x: (-x[1], x[0]))
+
+def get_version_conflicts(ecosystem: EcosystemData) -> Dict[str, List[str]]:
+    """Get packages with version conflicts (multiple versions in ecosystem)"""
+    package_versions = {}
+    for dep in ecosystem.deps.values():
+        if dep.pkg_name not in package_versions:
+            package_versions[dep.pkg_name] = set()
+        package_versions[dep.pkg_name].add(dep.pkg_version)
+
+    return {pkg: sorted(list(versions)) for pkg, versions in package_versions.items() if len(versions) > 1}
+
+def get_breaking_updates(ecosystem: EcosystemData) -> List[Tuple[str, str, str]]:
+    """Get packages with breaking updates available. Returns [(pkg_name, current_version, latest_version)]"""
+    breaking = []
+    for latest in ecosystem.latest.values():
+        if latest.source_type == "crate":  # Only check crates.io packages
+            pkg_versions = [dep.pkg_version for dep in ecosystem.deps.values() if dep.pkg_name == latest.pkg_name]
+            if pkg_versions:
+                current_version = max(pkg_versions, key=parse_version)
+                if is_breaking_change(current_version, latest.latest_version):
+                    breaking.append((latest.pkg_name, current_version, latest.latest_version))
+
+    return breaking
+
+def get_hub_gaps(ecosystem: EcosystemData) -> List[str]:
+    """Get packages used in ecosystem but missing from hub"""
+    return [latest.pkg_name for latest in ecosystem.latest.values() if latest.hub_status == "gap"]
+
+def get_repos_using_package(ecosystem: EcosystemData, pkg_name: str) -> List[RepoData]:
+    """Get repositories that use a specific package"""
+    repo_ids = set()
+    for dep in ecosystem.deps.values():
+        if dep.pkg_name == pkg_name:
+            repo_ids.add(dep.repo_id)
+
+    return [ecosystem.repos[repo_id] for repo_id in repo_ids if repo_id in ecosystem.repos]
+
+def format_aggregation_summary(ecosystem: EcosystemData) -> str:
+    """Format aggregation metrics into a readable summary"""
+    agg = ecosystem.aggregation
+    lines = []
+    lines.append(f"📊 **Ecosystem Overview**")
+    lines.append(f"   Repositories: {agg.get('total_repos', '?')}")
+    lines.append(f"   Dependencies: {agg.get('total_deps', '?')}")
+    lines.append(f"   Unique Packages: {agg.get('total_packages', '?')}")
+    lines.append(f"")
+    lines.append(f"🔗 **Package Sources**")
+    lines.append(f"   Crates.io: {agg.get('crate_packages', '?')}")
+    lines.append(f"   Git: {agg.get('git_packages', '?')}")
+    lines.append(f"   Local: {agg.get('local_packages', '?')}")
+    lines.append(f"   Workspace: {agg.get('workspace_packages', '?')}")
+    lines.append(f"")
+    lines.append(f"🎯 **Hub Integration**")
+    lines.append(f"   Using Hub: {agg.get('hub_using_repos', '?')} repos")
+    lines.append(f"   Current: {agg.get('hub_current', '?')} packages")
+    lines.append(f"   Outdated: {agg.get('hub_outdated', '?')} packages")
+    lines.append(f"   Gaps: {agg.get('hub_gap', '?')} packages")
+    lines.append(f"")
+    lines.append(f"⚠️ **Breaking Changes**")
+    lines.append(f"   Breaking Updates: {agg.get('breaking_updates', '?')}")
+    lines.append(f"   Safe Updates: {agg.get('safe_updates', '?')}")
+
+    return "\n".join(lines)
 
 def get_hub_dependencies():
     """Get dependencies from hub's Cargo.toml"""
@@ -1868,6 +2115,213 @@ def generate_data_cache(dependencies):
 
     print(f"\n{Colors.GREEN}{Colors.BOLD}✅ Data cache generated: {output_file}{Colors.END}")
 
+def superclean_targets():
+    """Clean target directories across all ecosystem repositories"""
+    print(f"{Colors.CYAN}{Colors.BOLD}🧹 SuperClean: Cleaning all target directories in ecosystem{Colors.END}")
+
+    # Use hydration to get repo list, or fall back to file discovery
+    try:
+        ecosystem = hydrate_tsv_cache()
+        # repo.path includes Cargo.toml, so get parent directory
+        repo_paths = [(Path(RUST_REPO_ROOT) / repo.path).parent for repo in ecosystem.repos.values()]
+        print(f"{Colors.GREEN}📋 Found {len(repo_paths)} repositories from cache{Colors.END}")
+    except FileNotFoundError:
+        print(f"{Colors.YELLOW}⚠️  Cache not found, discovering repositories...{Colors.END}")
+        # Fallback to finding Cargo.toml files
+        cargo_files = find_all_cargo_files()
+        repo_paths = [path.parent for path in cargo_files]
+        print(f"{Colors.GREEN}📋 Found {len(repo_paths)} repositories via discovery{Colors.END}")
+
+    cleaned_count = 0
+    total_size_freed = 0
+
+    # Initialize progress spinner
+    progress = ProgressSpinner("Initializing cleanup...", len(repo_paths))
+    progress.start()
+
+    try:
+        for i, repo_path in enumerate(repo_paths):
+            progress.update(i, f"Processing {repo_path.name}...")
+
+            target_path = repo_path / "target"
+            cargo_toml_path = repo_path / "Cargo.toml"
+
+            # Only process if there's a Cargo.toml file
+            if not cargo_toml_path.exists():
+                continue
+
+            if target_path.exists() and target_path.is_dir():
+                try:
+                    progress.update(i, f"Cleaning {repo_path.name}...")
+
+                    # Get size before cleaning
+                    result = subprocess.run(['du', '-sh', str(target_path)],
+                                          capture_output=True, text=True, timeout=10)
+                    size_str = result.stdout.split('\t')[0] if result.returncode == 0 else "unknown"
+
+                    # Use cargo clean in the repo directory
+                    result = subprocess.run(['cargo', 'clean'],
+                                          cwd=str(repo_path),
+                                          capture_output=True, text=True, timeout=60)
+
+                    if result.returncode == 0:
+                        cleaned_count += 1
+                        # Try to extract numeric size for total
+                        if size_str.endswith('M'):
+                            total_size_freed += float(size_str[:-1])
+                        elif size_str.endswith('G'):
+                            total_size_freed += float(size_str[:-1]) * 1024
+                        elif size_str.endswith('K'):
+                            total_size_freed += float(size_str[:-1]) / 1024
+
+                except subprocess.TimeoutExpired:
+                    pass  # Continue with other repos
+                except subprocess.CalledProcessError:
+                    pass  # Continue with other repos
+                except Exception:
+                    pass  # Continue with other repos
+
+        # Final update
+        progress.update(len(repo_paths), "Cleanup complete!")
+
+    finally:
+        progress.stop()
+
+    # Summary
+    print(f"\n{Colors.GREEN}{Colors.BOLD}✅ SuperClean Complete!{Colors.END}")
+    print(f"   🗑️  Cleaned {cleaned_count} target directories")
+    if total_size_freed > 0:
+        if total_size_freed > 1024:
+            print(f"   💾 Freed approximately {total_size_freed/1024:.1f}GB of disk space")
+        else:
+            print(f"   💾 Freed approximately {total_size_freed:.0f}MB of disk space")
+
+def tap_repositories(ssh_test_cmd=None):
+    """Tap repositories - check git status and auto-commit uncommitted changes
+
+    Args:
+        ssh_test_cmd: Custom SSH test command. Defaults to 'ssh -T git@github.com'
+                     Use 'ssh -T git@qodeninja' or any other custom command
+    """
+    from datetime import datetime
+
+    print(f"{Colors.CYAN}{Colors.BOLD}🚰 Tap: Auto-committing across ecosystem repositories{Colors.END}")
+
+    # Configure SSH test command
+    if ssh_test_cmd is None:
+        ssh_test_cmd = ['ssh', '-T', 'git@github.com']
+        expected_success_text = "successfully authenticated"
+    else:
+        # Parse custom SSH command
+        ssh_test_cmd = ssh_test_cmd.split() if isinstance(ssh_test_cmd, str) else ssh_test_cmd
+        expected_success_text = "successfully authenticated"  # Can be customized per command
+
+    # Test SSH connection first
+    print(f"{Colors.YELLOW}🔐 Testing SSH connection: {' '.join(ssh_test_cmd)}...{Colors.END}")
+    try:
+        result = subprocess.run(ssh_test_cmd,
+                              capture_output=True, text=True, timeout=10)
+
+        # Check for success in both stdout and stderr
+        output_text = (result.stdout + result.stderr).lower()
+        if expected_success_text in output_text or result.returncode == 0:
+            print(f"{Colors.GREEN}✅ SSH connection verified{Colors.END}")
+        else:
+            print(f"{Colors.RED}❌ SSH connection failed. Please check your SSH key setup.{Colors.END}")
+            print(f"   Test command: {' '.join(ssh_test_cmd)}")
+            print(f"   Output: {result.stderr or result.stdout}")
+            return
+    except subprocess.TimeoutExpired:
+        print(f"{Colors.RED}❌ SSH connection timeout{Colors.END}")
+        return
+    except Exception as e:
+        print(f"{Colors.RED}❌ SSH test failed: {e}{Colors.END}")
+        return
+
+    # Get repository list
+    try:
+        ecosystem = hydrate_tsv_cache()
+        repo_paths = [(Path(RUST_REPO_ROOT) / repo.path).parent for repo in ecosystem.repos.values()]
+        print(f"{Colors.GREEN}📋 Found {len(repo_paths)} repositories from cache{Colors.END}")
+    except FileNotFoundError:
+        print(f"{Colors.YELLOW}⚠️  Cache not found, discovering repositories...{Colors.END}")
+        cargo_files = find_all_cargo_files()
+        repo_paths = [path.parent for path in cargo_files]
+        print(f"{Colors.GREEN}📋 Found {len(repo_paths)} repositories via discovery{Colors.END}")
+
+    committed_count = 0
+    skipped_count = 0
+    error_count = 0
+    current_date = datetime.now().strftime("%Y-%m-%d")
+
+    # Initialize progress spinner
+    progress = ProgressSpinner("Initializing tap...", len(repo_paths))
+    progress.start()
+
+    try:
+        for i, repo_path in enumerate(repo_paths):
+            progress.update(i, f"Tapping {repo_path.name}...")
+
+            # Skip if not a git repository
+            if not (repo_path / ".git").exists():
+                skipped_count += 1
+                continue
+
+            try:
+                # Check git status
+                result = subprocess.run(['git', 'status', '--porcelain'],
+                                      cwd=str(repo_path),
+                                      capture_output=True, text=True, timeout=30)
+
+                if result.returncode != 0:
+                    error_count += 1
+                    continue
+
+                # If there are changes, add and commit them
+                if result.stdout.strip():
+                    progress.update(i, f"Committing changes in {repo_path.name}...")
+
+                    # Add all changes
+                    add_result = subprocess.run(['git', 'add', '.'],
+                                              cwd=str(repo_path),
+                                              capture_output=True, text=True, timeout=30)
+
+                    if add_result.returncode != 0:
+                        error_count += 1
+                        continue
+
+                    # Commit with standardized message
+                    commit_message = f"fix: hub batch auto tap {current_date}"
+                    commit_result = subprocess.run(['git', 'commit', '-m', commit_message],
+                                                 cwd=str(repo_path),
+                                                 capture_output=True, text=True, timeout=30)
+
+                    if commit_result.returncode == 0:
+                        committed_count += 1
+                    else:
+                        error_count += 1
+                else:
+                    # No changes to commit
+                    skipped_count += 1
+
+            except subprocess.TimeoutExpired:
+                error_count += 1
+            except Exception:
+                error_count += 1
+
+        # Final update
+        progress.update(len(repo_paths), "Tap complete!")
+
+    finally:
+        progress.stop()
+
+    # Summary
+    print(f"\n{Colors.GREEN}{Colors.BOLD}✅ Tap Complete!{Colors.END}")
+    print(f"   📝 Committed changes in {committed_count} repositories")
+    print(f"   ⏭️  Skipped {skipped_count} repositories (no changes or not git repos)")
+    if error_count > 0:
+        print(f"   ❌ Errors in {error_count} repositories")
+
 def main():
     def signal_handler(signum, frame):
         """Global signal handler for graceful exit"""
@@ -1891,9 +2345,10 @@ def main():
 
     parser = argparse.ArgumentParser(description="Rust dependency analyzer with enhanced commands")
     parser.add_argument('command', nargs='?', default='analyze',
-                       choices=['analyze', 'query', 'q', 'all', 'export', 'eco', 'review', 'pkg', 'latest', 'hub', 'data'],
+                       choices=['analyze', 'query', 'q', 'all', 'export', 'eco', 'review', 'pkg', 'latest', 'hub', 'data', 'superclean', 'tap'],
                        help='Command to run')
     parser.add_argument('package', nargs='?', help='Package name for pkg/latest commands')
+    parser.add_argument('--ssh-test', default=None, help='Custom SSH test command for tap (e.g., "ssh -T git@qodeninja")')
 
     args = parser.parse_args()
 
@@ -1930,6 +2385,25 @@ def main():
         elif args.command == 'data':
             # Generate structured data cache
             generate_data_cache(dependencies)
+        elif args.command == 'test':
+            # Test hydration function
+            try:
+                ecosystem = hydrate_tsv_cache()
+                print(f"{Colors.GREEN}✅ Hydration successful!{Colors.END}")
+                print(f"   Loaded {len(ecosystem.aggregation)} aggregation metrics")
+                print(f"   Loaded {len(ecosystem.repos)} repositories")
+                print(f"   Loaded {len(ecosystem.deps)} dependencies")
+                print(f"   Loaded {len(ecosystem.latest)} packages")
+                print(f"   Loaded {len(ecosystem.version_maps)} version mappings")
+                print(f"\n{format_aggregation_summary(ecosystem)}")
+            except Exception as e:
+                print(f"{Colors.RED}❌ Hydration failed: {e}{Colors.END}")
+        elif args.command == 'superclean':
+            # Clean all target directories in ecosystem
+            superclean_targets()
+        elif args.command == 'tap':
+            # Auto-commit uncommitted changes across repositories
+            tap_repositories(ssh_test_cmd=args.ssh_test)
         else:  # default 'analyze', 'query', 'q'
             # Show package usage analysis
             analyze_package_usage(dependencies)

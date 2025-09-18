@@ -1,3 +1,23 @@
+#------ SECTION : AGGREGATION METRICS --------#
+KEY	VALUE
+total_repos	18
+hub_using_repos	0
+total_deps	176
+total_packages	72
+git_packages	1
+local_packages	4
+crate_packages	67
+workspace_packages	0
+hub_current	2
+hub_outdated	10
+hub_gap	60
+hub_local	0
+breaking_updates	19
+safe_updates	116
+unknown_updates	7
+stable_versions	80
+unstable_versions	83
+
 #------ SECTION : REPO LIST --------#
 REPO_ID	REPO_NAME	PATH	PARENT	LAST_UPDATE	CARGO_VERSION	HUB_USAGE	HUB_STATUS
 100	paintbox	oodx/projects/paintbox/Cargo.toml	projects	1757345459	0.0.1	NONE	none
