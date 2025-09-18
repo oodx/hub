@@ -16,6 +16,10 @@ import json
 import argparse
 import time
 import threading
+import signal
+import termios
+import tty
+import io
 from pathlib import Path
 from collections import defaultdict
 from packaging import version
@@ -23,48 +27,188 @@ import subprocess
 import urllib.request
 import urllib.error
 
-# ANSI color codes
-class Colors:
-    RED = '\033[91m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    BLUE = '\033[94m'
-    PURPLE = '\033[95m'
-    CYAN = '\033[96m'
-    WHITE = '\033[97m'
-    GRAY = '\033[90m'
-    BOLD = '\033[1m'
-    DIM = '\033[2m'
-    END = '\033[0m'
+# Get RUST_REPO_ROOT environment variable or auto-detect
+RUST_REPO_ROOT = os.environ.get('RUST_REPO_ROOT')
+if not RUST_REPO_ROOT:
+    # Auto-detect by finding 'rust' directory in the current path
+    current_path = Path.cwd()
+    for parent in [current_path] + list(current_path.parents):
+        if parent.name == 'rust' or (parent / 'rust').exists():
+            if parent.name == 'rust':
+                RUST_REPO_ROOT = str(parent)
+            else:
+                RUST_REPO_ROOT = str(parent / 'rust')
+            break
 
-class Spinner:
-    """Simple spinner for showing progress"""
-    def __init__(self, message="Working"):
+    if not RUST_REPO_ROOT:
+        # Fallback: try to find rust directory from common patterns
+        possible_paths = [
+            Path.home() / 'repos' / 'code' / 'rust',
+            Path('/home/xnull/repos/code/rust'),
+            Path.cwd().parent.parent.parent  # Assume we're in rust/oodx/projects/hub
+        ]
+        for path in possible_paths:
+            if path.exists() and path.name == 'rust':
+                RUST_REPO_ROOT = str(path)
+                break
+
+# Legacy color palette from colors.rs
+class Colors:
+    # Core legacy colors (v0.5.0)
+    RED = '\x1B[38;5;9m'      # red - bright red
+    GREEN = '\x1B[38;5;10m'   # green - bright green
+    YELLOW = '\x1B[33m'       # yellow - standard yellow
+    BLUE = '\x1B[36m'         # blue - cyan-ish blue
+    PURPLE = '\x1B[38;5;141m' # purple2 - light purple
+    CYAN = '\x1B[38;5;14m'    # cyan - bright cyan
+    WHITE = '\x1B[38;5;247m'  # white - light gray
+    GRAY = '\x1B[38;5;242m'   # grey - medium gray
+
+    # Extended colors for semantic meaning
+    ORANGE = '\x1B[38;5;214m' # orange - warnings/attention
+    AMBER = '\x1B[38;5;220m'  # amber - golden orange
+    EMERALD = '\x1B[38;5;34m' # emerald - pure green for success
+    CRIMSON = '\x1B[38;5;196m' # crimson - pure red for errors
+
+    # Style modifiers
+    BOLD = '\x1B[1m'
+    DIM = '\x1B[2m'
+    END = '\x1B[0m'
+    RESET = '\x1B[0m'
+
+class ProgressSpinner:
+    """Progress bar with spinner for showing detailed progress"""
+    def __init__(self, message="Working", total=100):
         self.message = message
+        self.total = total
+        self.current = 0
         self.spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
         self.idx = 0
         self.stop_spinner = False
         self.spinner_thread = None
+        self.max_line_length = 0
+        self._setup_signal_handlers()
+
+    def _setup_signal_handlers(self):
+        """Setup signal handlers for graceful exit"""
+        signal.signal(signal.SIGINT, self._signal_handler)  # Ctrl+C
+        signal.signal(signal.SIGTERM, self._signal_handler)  # Termination
+        # Note: SIGTSTP (Ctrl+Z) is handled by the shell and suspends the process
+
+    def _signal_handler(self, signum, frame):
+        """Handle interrupt signals gracefully"""
+        self.stop_spinner = True
+        if self.spinner_thread and self.spinner_thread.is_alive():
+            # Clean up display
+            clear_line = ' ' * (self.max_line_length + 20)
+            sys.stdout.write('\r')  # Move to start of current line
+            sys.stdout.write('\033[1A')  # Move up one line
+            sys.stdout.write(f'\r{clear_line}\n{clear_line}')  # Clear both lines
+            sys.stdout.write('\r')  # Move cursor to start
+            sys.stdout.write('\033[1A')  # Move up one line
+            sys.stdout.flush()
+
+        print(f"\n{Colors.YELLOW}⚠️  Operation interrupted by user{Colors.END}")
+        sys.exit(0)
+
+    def _draw_progress_bar(self, width=40):
+        """Draw a progress bar"""
+        if self.total == 0:
+            return "[" + "?" * width + "]"
+
+        filled = int(width * self.current / self.total)
+        bar = "█" * filled + "▒" * (width - filled)
+        return f"[{bar}]"
+
+    def _get_percentage(self):
+        """Get percentage as string"""
+        if self.total == 0:
+            return "?%"
+        return f"{int(100 * self.current / self.total)}%"
 
     def spin(self):
+        first_iteration = True
         while not self.stop_spinner:
             char = self.spinner_chars[self.idx % len(self.spinner_chars)]
-            sys.stdout.write(f'\r{Colors.CYAN}{char}{Colors.END} {self.message}')
+
+            # Progress bar line
+            progress_bar = self._draw_progress_bar()
+            percentage = self._get_percentage()
+            progress_line = f"{Colors.BLUE}{progress_bar}{Colors.END} {Colors.WHITE}{percentage}{Colors.END} ({self.current}/{self.total})"
+
+            # Spinner line
+            spinner_line = f"{Colors.CYAN}{char}{Colors.END} {self.message}"
+
+            # Track max length for clearing
+            current_length = max(len(progress_line), len(spinner_line))
+            self.max_line_length = max(self.max_line_length, current_length)
+
+            if first_iteration:
+                # First time, just write the lines
+                sys.stdout.write(f'{progress_line}\n\r{spinner_line}')
+                first_iteration = False
+            else:
+                # Move to start of line, clear both lines, then rewrite
+                sys.stdout.write('\033[1A')  # Move up to progress line
+                sys.stdout.write('\r')  # Move to start of line
+                sys.stdout.write('\033[K')  # Clear entire line
+                sys.stdout.write(f'{progress_line}\n\r')
+                sys.stdout.write('\033[K')  # Clear entire line
+                sys.stdout.write(f'{spinner_line}')
+
             sys.stdout.flush()
+
             self.idx += 1
             time.sleep(0.1)
 
     def start(self):
         self.stop_spinner = False
+        # Save terminal settings and disable canonical mode (but keep signal handling)
+        try:
+            self.old_terminal_settings = termios.tcgetattr(sys.stdin)
+            # Get current settings
+            new_settings = termios.tcgetattr(sys.stdin)
+            # Disable canonical mode and echo (but keep signal handling)
+            new_settings[3] &= ~(termios.ICANON | termios.ECHO)
+            termios.tcsetattr(sys.stdin, termios.TCSANOW, new_settings)
+        except (termios.error, io.UnsupportedOperation):
+            self.old_terminal_settings = None
+
+        # Hide cursor during animation
+        sys.stdout.write('\033[?25l')
+        sys.stdout.flush()
         self.spinner_thread = threading.Thread(target=self.spin)
         self.spinner_thread.start()
+
+    def update(self, current, message=None):
+        """Update progress"""
+        self.current = current
+        if message:
+            self.message = message
 
     def stop(self, final_message=None):
         self.stop_spinner = True
         if self.spinner_thread:
             self.spinner_thread.join()
-        # Clear the spinner line
-        sys.stdout.write('\r' + ' ' * (len(self.message) + 10) + '\r')
+
+        # Move up to progress line and clear both lines
+        sys.stdout.write('\033[1A')  # Move up to progress line
+        sys.stdout.write('\r')  # Move to start of line
+        clear_line = ' ' * (self.max_line_length + 20)
+        sys.stdout.write(f'{clear_line}\n{clear_line}')  # Clear both lines
+        sys.stdout.write('\033[1A')  # Move back up to where progress line was
+        sys.stdout.write('\r')  # Move to start of line
+
+        # Restore terminal settings
+        if hasattr(self, 'old_terminal_settings') and self.old_terminal_settings:
+            try:
+                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.old_terminal_settings)
+            except (termios.error, io.UnsupportedOperation):
+                pass
+
+        # Show cursor again
+        sys.stdout.write('\033[?25h')
+
         if final_message:
             print(final_message)
         sys.stdout.flush()
@@ -89,21 +233,45 @@ def get_latest_version(package_name):
         with urllib.request.urlopen(url, timeout=10) as response:
             data = json.loads(response.read().decode())
             return data['crate']['max_version']
+    except KeyboardInterrupt:
+        # Re-raise to let the main handler deal with it
+        raise
     except (urllib.error.URLError, urllib.error.HTTPError, KeyError, json.JSONDecodeError):
         return None
 
 def get_parent_repo(cargo_path):
-    """Get parent.repo format - parent folder + project name"""
-    project_name = cargo_path.parent.name
-    parent_name = cargo_path.parent.parent.name
+    """Get parent.repo format - parent folder + project name using relative paths"""
+    # Use relative path from RUST_REPO_ROOT
+    rel_path = get_relative_path(cargo_path)
+    rel_cargo_path = Path(rel_path)
+
+    project_name = rel_cargo_path.parent.name
+    parent_name = rel_cargo_path.parent.parent.name
+
+    # Handle edge cases
+    if parent_name == '.':
+        parent_name = 'root'
+
     return f"{parent_name}.{project_name}"
 
 def find_cargo_files(root_dir):
-    """Find all Cargo.toml files, excluding target directories"""
+    """Find all Cargo.toml files, excluding target, ref, _arch, archive, and howto directories"""
     cargo_files = []
     for root, dirs, files in os.walk(root_dir):
+        # Get relative path from root_dir for checking
+        rel_path = Path(root).relative_to(root_dir) if str(root).startswith(str(root_dir)) else Path(root)
+        rel_parts = rel_path.parts if rel_path != Path('.') else []
+
+        # Skip if in ref, howto, or contains _arch/archive
+        if rel_parts and (rel_parts[0] == 'ref' or
+                         rel_parts[0] == 'howto' or
+                         any('_arch' in part or 'archive' in part for part in rel_parts)):
+            dirs[:] = []  # Don't descend into subdirectories
+            continue
+
         # Skip target directories
-        dirs[:] = [d for d in dirs if d != 'target']
+        dirs[:] = [d for d in dirs if d != 'target' and d != 'ref' and d != 'howto'
+                   and '_arch' not in d and 'archive' not in d]
 
         if 'Cargo.toml' in files:
             cargo_path = Path(root) / 'Cargo.toml'
@@ -111,9 +279,38 @@ def find_cargo_files(root_dir):
 
     return cargo_files
 
+def get_relative_path(file_path):
+    """Convert absolute path to relative path from RUST_REPO_ROOT"""
+    if not RUST_REPO_ROOT:
+        return str(file_path)
+
+    try:
+        abs_path = Path(file_path).resolve()
+        rust_root = Path(RUST_REPO_ROOT).resolve()
+
+        # Check if file is under RUST_REPO_ROOT
+        if str(abs_path).startswith(str(rust_root)):
+            rel_path = abs_path.relative_to(rust_root)
+            return str(rel_path)
+        else:
+            # File is outside RUST_REPO_ROOT, return full path
+            return str(file_path)
+    except (ValueError, OSError):
+        # Fallback to original path if there's any issue
+        return str(file_path)
+
 def analyze_dependencies():
     """Main analysis function"""
-    rust_dir = Path('/home/xnull/repos/code/rust')
+    if not RUST_REPO_ROOT:
+        print(f"{Colors.RED}❌ Could not determine RUST_REPO_ROOT. Please set the environment variable or run from within a rust project directory.{Colors.END}")
+        return {}
+
+    rust_dir = Path(RUST_REPO_ROOT)
+    if not rust_dir.exists():
+        print(f"{Colors.RED}❌ RUST_REPO_ROOT directory does not exist: {rust_dir}{Colors.END}")
+        return {}
+
+    print(f"{Colors.BLUE}🔍 Using RUST_REPO_ROOT: {Colors.BOLD}{rust_dir}{Colors.END}")
     cargo_files = find_cargo_files(rust_dir)
 
     # Data structure: dep_name -> [(parent.repo, version, dep_type, cargo_path), ...]
@@ -174,11 +371,22 @@ def format_version_analysis(dependencies):
     print(f"{Colors.BLUE}{'='*80}{Colors.END}\n")
 
     conflicts_found = 0
-    # Cache for latest versions
-    latest_cache = {}
 
-    # Show progress for latest version fetching
-    print(f"{Colors.GRAY}Fetching latest versions from crates.io...{Colors.END}")
+    # Load latest versions from data file if it exists
+    latest_cache = {}
+    data_file = Path("deps_data.txt")
+    if data_file.exists():
+        print(f"{Colors.GRAY}Loading latest versions from deps_data.txt cache...{Colors.END}\n")
+        with open(data_file, 'r') as f:
+            for line in f:
+                if line.startswith("DEPENDENCY:"):
+                    parts = line.strip().split(", LATEST: ")
+                    if len(parts) == 2:
+                        dep_name = parts[0].replace("DEPENDENCY: ", "")
+                        latest_version = parts[1]
+                        latest_cache[dep_name] = latest_version
+    else:
+        print(f"{Colors.GRAY}No cache found - fetching latest versions from crates.io...{Colors.END}")
 
     for dep_name, usages in sorted_deps:
         # Get unique versions
@@ -196,12 +404,8 @@ def format_version_analysis(dependencies):
         if not versions:
             continue
 
-        # Get latest version from crates.io
-        if dep_name not in latest_cache:
-            latest_version = get_latest_version(dep_name)
-            latest_cache[dep_name] = latest_version
-        else:
-            latest_version = latest_cache[dep_name]
+        # Get latest version from cache (no API call)
+        latest_version = latest_cache.get(dep_name)
 
         # Check for conflicts (multiple versions)
         has_conflict = len(versions) > 1
@@ -265,9 +469,9 @@ def export_raw_data(dependencies):
 
     total_deps = len(filtered_deps)
 
-    # Start spinner
-    spinner = Spinner(f"Exporting {total_deps} dependencies with latest versions...")
-    spinner.start()
+    # Start progress spinner
+    progress = ProgressSpinner("Initializing export...", total_deps)
+    progress.start()
 
     # Cache for latest versions
     latest_cache = {}
@@ -281,8 +485,8 @@ def export_raw_data(dependencies):
             for dep_name, usages in sorted(filtered_deps.items()):
                 processed += 1
 
-                # Update spinner message with progress
-                spinner.message = f"Exporting dependencies... ({processed}/{total_deps}) {dep_name}"
+                # Update progress with current dependency
+                progress.update(processed, f"Fetching latest version for {dep_name}...")
 
                 # Get latest version from crates.io
                 if dep_name not in latest_cache:
@@ -291,17 +495,21 @@ def export_raw_data(dependencies):
                 else:
                     latest_version = latest_cache[dep_name]
 
+                # Update progress message for writing
+                progress.update(processed, f"Writing {dep_name} to file...")
+
                 latest_str = f", LATEST: {latest_version}" if latest_version else ""
                 f.write(f"DEPENDENCY: {dep_name}{latest_str}\n")
                 for parent_repo, ver_str, dep_type, cargo_path in usages:
-                    f.write(f"  {parent_repo:<25} {ver_str:<12} {dep_type:<4} {cargo_path}\n")
+                    rel_path = get_relative_path(cargo_path)
+                    f.write(f"  {parent_repo:<25} {ver_str:<12} {dep_type:<4} {rel_path}\n")
                 f.write("\n")
 
-        # Stop spinner and show success
-        spinner.stop(f"{Colors.GREEN}✅ Raw data exported to {Colors.BOLD}{output_file}{Colors.END} ({total_deps} dependencies)")
+        # Stop progress and show success
+        progress.stop(f"{Colors.GREEN}✅ Raw data exported to {Colors.BOLD}{output_file}{Colors.END} ({total_deps} dependencies)")
 
     except Exception as e:
-        spinner.stop(f"{Colors.RED}❌ Export failed: {e}{Colors.END}")
+        progress.stop(f"{Colors.RED}❌ Export failed: {e}{Colors.END}")
         raise
 
 def detailed_review(dependencies):
@@ -309,8 +517,21 @@ def detailed_review(dependencies):
     print(f"{Colors.WHITE}{Colors.BOLD}📋 DETAILED DEPENDENCY REVIEW{Colors.END}")
     print(f"{Colors.GRAY}{'='*80}{Colors.END}\n")
 
-    # Cache for latest versions to avoid repeated API calls
+    # Load latest versions from data file if it exists
     latest_cache = {}
+    data_file = Path("deps_data.txt")
+    if data_file.exists():
+        print(f"{Colors.GRAY}Loading latest versions from deps_data.txt cache (run 'export' to refresh)...{Colors.END}\n")
+        with open(data_file, 'r') as f:
+            for line in f:
+                if line.startswith("DEPENDENCY:"):
+                    parts = line.strip().split(", LATEST: ")
+                    if len(parts) == 2:
+                        dep_name = parts[0].replace("DEPENDENCY: ", "")
+                        latest_version = parts[1]
+                        latest_cache[dep_name] = latest_version
+    else:
+        print(f"{Colors.YELLOW}⚠️  No deps_data.txt found. Run 'deps.py export' first to cache latest versions.{Colors.END}\n")
 
     # Filter and sort dependencies
     filtered_deps = {}
@@ -342,7 +563,7 @@ def detailed_review(dependencies):
         max_version = max(sorted_versions)
         ecosystem_version = str(max_version)
 
-        # Get latest version from crates.io
+        # Get latest version from cache or fetch if not available
         if dep_name not in latest_cache:
             latest_version = get_latest_version(dep_name)
             latest_cache[dep_name] = latest_version
@@ -461,6 +682,122 @@ def analyze_package(dependencies, package_name):
     else:
         print(f"{Colors.GREEN}✅ No version conflicts{Colors.END}")
 
+def analyze_hub_status(dependencies):
+    """Analyze hub's current package status"""
+    print(f"{Colors.PURPLE}{Colors.BOLD}🎯 HUB PACKAGE STATUS{Colors.END}")
+    print(f"{Colors.PURPLE}{'='*80}{Colors.END}\n")
+
+    # Get hub dependencies
+    hub_deps = get_hub_dependencies()
+
+    if not hub_deps:
+        print(f"{Colors.RED}❌ No hub dependencies found or could not read hub's Cargo.toml{Colors.END}")
+        return
+
+    # Load latest versions from cache
+    latest_cache = {}
+    data_file = Path("deps_data.txt")
+    if data_file.exists():
+        with open(data_file, 'r') as f:
+            for line in f:
+                if line.startswith("DEPENDENCY:"):
+                    parts = line.strip().split(", LATEST: ")
+                    if len(parts) == 2:
+                        dep_name = parts[0].replace("DEPENDENCY: ", "")
+                        latest_version = parts[1]
+                        latest_cache[dep_name] = latest_version
+
+    # Count usage for all packages in ecosystem
+    package_usage = {}
+    for dep_name, usages in dependencies.items():
+        version_usages = [(parent_repo, ver, typ, path) for parent_repo, ver, typ, path in usages
+                         if ver not in ['path', 'workspace']]
+        if version_usages:
+            unique_repos = set(parent_repo.split('.')[1] for parent_repo, _, _, _ in version_usages)
+            package_usage[dep_name] = len(unique_repos)
+
+    # Analyze hub packages
+    hub_current = []
+    hub_outdated = []
+
+    for dep_name, hub_version_str in hub_deps.items():
+        hub_version = parse_version(hub_version_str)
+        latest_version = parse_version(latest_cache.get(dep_name, ""))
+        usage_count = package_usage.get(dep_name, 0)
+
+        if latest_version and hub_version and hub_version < latest_version:
+            hub_outdated.append((dep_name, hub_version_str, latest_cache.get(dep_name, "unknown"), usage_count))
+        else:
+            hub_current.append((dep_name, hub_version_str, latest_cache.get(dep_name, hub_version_str), usage_count))
+
+    # Sort by usage count
+    hub_current.sort(key=lambda x: x[3], reverse=True)
+    hub_outdated.sort(key=lambda x: x[3], reverse=True)
+
+    # Print current packages in columns
+    if hub_current:
+        print(f"{Colors.PURPLE}{Colors.BOLD}CURRENT PACKAGES:{Colors.END}")
+        print(f"{Colors.WHITE}{'Package':<20} {'Hub Version':<15} {'Latest':<15} {'Usage':<10}{Colors.END}")
+        print(f"{Colors.GRAY}{'-' * 60}{Colors.END}")
+
+        for dep_name, hub_ver, latest_ver, usage in hub_current:
+            usage_color = Colors.GREEN if usage >= 5 else Colors.WHITE if usage >= 3 else Colors.GRAY
+            print(f"  {Colors.GREEN}{dep_name:<20}{Colors.END} "
+                  f"{Colors.WHITE}{hub_ver:<15}{Colors.END} "
+                  f"{Colors.CYAN}{latest_ver:<15}{Colors.END} "
+                  f"{usage_color}({usage} projects){Colors.END}")
+        print()
+
+    # Print outdated packages
+    if hub_outdated:
+        print(f"{Colors.PURPLE}{Colors.BOLD}OUTDATED PACKAGES:{Colors.END}")
+        print(f"{Colors.WHITE}{'Package':<20} {'Hub Version':<15} {'Latest':<15} {'Usage':<10}{Colors.END}")
+        print(f"{Colors.GRAY}{'-' * 60}{Colors.END}")
+
+        for dep_name, hub_ver, latest_ver, usage in hub_outdated:
+            usage_color = Colors.GREEN if usage >= 5 else Colors.WHITE if usage >= 3 else Colors.GRAY
+            print(f"  {Colors.ORANGE}{dep_name:<20}{Colors.END} "
+                  f"{Colors.YELLOW}{hub_ver:<15}{Colors.END} "
+                  f"{Colors.CYAN}{latest_ver:<15}{Colors.END} "
+                  f"{usage_color}({usage} projects){Colors.END}")
+        print()
+
+    # Find opportunities (5+ usage packages not in hub)
+    opportunities = []
+    for dep_name, usage_count in package_usage.items():
+        if usage_count >= 5 and dep_name not in hub_deps:
+            latest_ver = latest_cache.get(dep_name, "unknown")
+            opportunities.append((dep_name, usage_count, latest_ver))
+
+    opportunities.sort(key=lambda x: x[1], reverse=True)
+
+    # Print opportunities in columns
+    if opportunities:
+        print(f"{Colors.PURPLE}{Colors.BOLD}PACKAGE OPPORTUNITIES (5+ usage, not in hub):{Colors.END}")
+        print(f"{Colors.GRAY}{'-' * 80}{Colors.END}")
+        col_width = 30
+        cols = 3
+
+        for i in range(0, len(opportunities), cols):
+            row = "  "
+            for j in range(cols):
+                if i + j < len(opportunities):
+                    dep_name, usage, latest_ver = opportunities[i + j]
+                    text = f"{dep_name}({usage})"
+                    colored = f"{Colors.GREEN}{text}{Colors.END}"  # Changed to green to match Gap color
+                    # Pad based on actual text length, not colored string
+                    padding = " " * max(0, col_width - len(text))
+                    row += colored + padding
+            print(row.rstrip())
+        print()
+
+    # Summary using hub-only mode (no High/Med/Low categories)
+    # Convert package_usage to the format expected by calculate_hub_status
+    package_consumers_format = {dep_name: (count, []) for dep_name, count in package_usage.items()}
+    hub_status = calculate_hub_status(package_consumers_format, hub_deps, latest_cache)
+
+    print_summary_table(hub_status=hub_status, hub_only=True)
+
 def check_latest(package_name):
     """Check latest version of a specific package"""
     print(f"{Colors.CYAN}{Colors.BOLD}🔍 CHECKING LATEST VERSION: {package_name}{Colors.END}")
@@ -475,10 +812,313 @@ def check_latest(package_name):
         print(f"{Colors.RED}❌ Could not fetch latest version for '{package_name}'")
         print(f"{Colors.GRAY}Package may not exist on crates.io or network error{Colors.END}")
 
+def calculate_hub_status(package_consumers, hub_deps, latest_cache):
+    """Calculate hub status metrics"""
+    hub_current = []  # In hub and up-to-date
+    hub_outdated = []  # In hub but outdated
+    hub_unused = []   # In hub but not used anywhere
+    hub_gap_high = []  # High usage packages not in hub
+    hub_unique = []  # All packages not in hub
+
+    # First, check what's actually used in the ecosystem
+    for dep_name, (count, _) in package_consumers.items():
+        if dep_name in hub_deps:
+            hub_version = parse_version(hub_deps[dep_name])
+            latest_version = parse_version(latest_cache.get(dep_name, ""))
+            if latest_version and hub_version and hub_version < latest_version:
+                hub_outdated.append(dep_name)
+            else:
+                hub_current.append(dep_name)
+        else:
+            hub_unique.append(dep_name)
+            if count >= 5:
+                hub_gap_high.append(dep_name)
+
+    # Check for hub packages that aren't used anywhere
+    used_packages = set(package_consumers.keys())
+    for dep_name in hub_deps:
+        if dep_name not in used_packages:
+            hub_unused.append(dep_name)
+
+    return hub_current, hub_outdated, hub_unused, hub_gap_high, hub_unique
+
+def print_summary_table(high_usage=None, medium_usage=None, low_usage=None, package_consumers=None, hub_status=None, hub_only=False):
+    """Print summary table with package counts and optional hub status"""
+    col_width = 12
+
+    # Only show package counts if not hub_only mode
+    if not hub_only and high_usage is not None:
+        print(f"{Colors.PURPLE}{Colors.BOLD}SUMMARY:{Colors.END}")
+        # Package counts
+        labels = ["High", "Med", "Low", "Total"]
+        values = [len(high_usage), len(medium_usage), len(low_usage), len(package_consumers)]
+        colors = [Colors.WHITE, Colors.WHITE, Colors.GRAY, Colors.BOLD]
+
+        row = "  "
+        for label in labels:
+            row += f"{label:<{col_width}}"
+        print(row)
+
+        row = "  "
+        for i, (value, color) in enumerate(zip(values, colors)):
+            text = str(value)
+            colored = f"{color}{text}{Colors.END}"
+            padding = " " * (col_width - len(text))
+            row += colored + padding
+        print(row)
+
+        print()
+
+    # Hub status (if provided)
+    if hub_status:
+        hub_current, hub_outdated, hub_unused, hub_gap_high, hub_unique = hub_status
+
+        # Use different title if hub_only mode
+        title = "HUB STATUS:" if not hub_only else "HUB PACKAGES:"
+        print(f"{Colors.PURPLE}{Colors.BOLD}{title}{Colors.END}")
+
+        hub_labels = ["Current", "Outdated", "Gap", "Unused", "Unique"]
+        hub_values = [len(hub_current), len(hub_outdated), len(hub_gap_high), len(hub_unused), len(hub_unique)]
+        hub_colors = [Colors.BLUE, Colors.ORANGE, Colors.GREEN, Colors.RED, Colors.GRAY]
+
+        row = "  "
+        for label in hub_labels:
+            row += f"{label:<{col_width}}"
+        print(row)
+
+        row = "  "
+        for i, (value, color) in enumerate(zip(hub_values, hub_colors)):
+            text = str(value)
+            colored = f"{color}■{Colors.END} {color}{text}{Colors.END}"
+            # Calculate padding based on visible text (■ + space + number)
+            visible_len = 1 + 1 + len(text)  # block + space + number
+            padding = " " * (col_width - visible_len)
+            row += colored + padding
+        print(row)
+
+        print()
+
+def get_hub_dependencies():
+    """Get dependencies from hub's Cargo.toml"""
+    hub_deps = {}
+    hub_cargo_path = Path(RUST_REPO_ROOT) / "oodx" / "projects" / "hub" / "Cargo.toml"
+
+    if hub_cargo_path.exists():
+        try:
+            with open(hub_cargo_path, 'r') as f:
+                cargo_data = toml.load(f)
+
+            # Parse regular dependencies
+            if 'dependencies' in cargo_data:
+                for dep_name, dep_info in cargo_data['dependencies'].items():
+                    if isinstance(dep_info, dict) and 'version' in dep_info:
+                        hub_deps[dep_name] = dep_info['version']
+                    elif isinstance(dep_info, str):
+                        hub_deps[dep_name] = dep_info
+
+            # Parse dev-dependencies
+            if 'dev-dependencies' in cargo_data:
+                for dep_name, dep_info in cargo_data['dev-dependencies'].items():
+                    if isinstance(dep_info, dict) and 'version' in dep_info:
+                        hub_deps[dep_name] = dep_info['version']
+                    elif isinstance(dep_info, str):
+                        hub_deps[dep_name] = dep_info
+        except Exception as e:
+            print(f"{Colors.YELLOW}⚠️  Could not read hub's Cargo.toml: {e}{Colors.END}")
+
+    return hub_deps
+
+def analyze_package_usage(dependencies):
+    """Analyze package usage across the ecosystem"""
+    print(f"{Colors.PURPLE}{Colors.BOLD}📊 PACKAGE USAGE ANALYSIS{Colors.END}")
+    print(f"{Colors.PURPLE}{'='*80}{Colors.END}\n")
+
+    # Get hub dependencies
+    hub_deps = get_hub_dependencies()
+
+    # Load latest versions from cache
+    latest_cache = {}
+    data_file = Path("deps_data.txt")
+    if data_file.exists():
+        with open(data_file, 'r') as f:
+            for line in f:
+                if line.startswith("DEPENDENCY:"):
+                    parts = line.strip().split(", LATEST: ")
+                    if len(parts) == 2:
+                        dep_name = parts[0].replace("DEPENDENCY: ", "")
+                        latest_version = parts[1]
+                        latest_cache[dep_name] = latest_version
+
+    # Count consumers for each package
+    package_consumers = {}
+    for dep_name, usages in dependencies.items():
+        # Filter out path/workspace dependencies
+        version_usages = [(parent_repo, ver, typ, path) for parent_repo, ver, typ, path in usages
+                         if ver not in ['path', 'workspace']]
+        if version_usages:
+            # Get unique parent repos
+            unique_repos = set(parent_repo.split('.')[1] for parent_repo, _, _, _ in version_usages)
+            package_consumers[dep_name] = (len(unique_repos), version_usages)
+
+    # Categorize packages
+    high_usage = []  # 5+ consumers
+    medium_usage = []  # 3-4 consumers
+    low_usage = []  # 1-2 consumers
+
+    for dep_name, (consumer_count, usages) in package_consumers.items():
+        if consumer_count >= 5:
+            high_usage.append((dep_name, consumer_count, usages))
+        elif consumer_count >= 3:
+            medium_usage.append((dep_name, consumer_count, usages))
+        else:
+            low_usage.append((dep_name, consumer_count, usages))
+
+    # Sort each category: hub packages first, then by usage count
+    def sort_key(item):
+        dep_name, count, _ = item
+        in_hub = dep_name in hub_deps
+        # Return tuple: (0 if in hub else 1, -count) for sorting
+        # This puts hub packages first, then sorts by count descending
+        return (0 if in_hub else 1, -count)
+
+    high_usage.sort(key=sort_key)
+    medium_usage.sort(key=sort_key)
+    low_usage.sort(key=sort_key)
+
+    # Print summary at the top (package counts only for query view)
+    print_summary_table(high_usage, medium_usage, low_usage, package_consumers)
+
+    # Print high usage packages (5+) in columns
+    if high_usage:
+        print(f"{Colors.PURPLE}{Colors.BOLD}HIGH USAGE (5+ projects):{Colors.END}")
+        print(f"{Colors.GRAY}{'-' * 80}{Colors.END}")
+        col_width = 25
+        cols = 3
+        for i in range(0, len(high_usage), cols):
+            row = "  "
+            for j in range(cols):
+                if i + j < len(high_usage):
+                    dep_name, count, _ = high_usage[i + j]
+                    in_hub = dep_name in hub_deps
+                    if in_hub:
+                        hub_version = parse_version(hub_deps[dep_name])
+                        latest_version = parse_version(latest_cache.get(dep_name, ""))
+                        star = "*" if latest_version and hub_version and hub_version < latest_version else ""
+                        text = f"{dep_name}({count}){star}"
+                        colored = f"{Colors.BLUE}{text}{Colors.END}"
+                    else:
+                        text = f"{dep_name}({count})"
+                        colored = f"{Colors.GREEN}{text}{Colors.END}"
+                    # Pad based on actual text length, not colored string
+                    padding = " " * max(0, col_width - len(text))
+                    row += colored + padding
+            print(row.rstrip())
+        print()
+
+    # Print medium usage packages (3-4) in columns
+    if medium_usage:
+        print(f"{Colors.PURPLE}{Colors.BOLD}MEDIUM USAGE (3-4 projects):{Colors.END}")
+        print(f"{Colors.GRAY}{'-' * 80}{Colors.END}")
+        col_width = 25
+        cols = 3
+        for i in range(0, len(medium_usage), cols):
+            row = "  "
+            for j in range(cols):
+                if i + j < len(medium_usage):
+                    dep_name, count, _ = medium_usage[i + j]
+                    in_hub = dep_name in hub_deps
+                    if in_hub:
+                        hub_version = parse_version(hub_deps[dep_name])
+                        latest_version = parse_version(latest_cache.get(dep_name, ""))
+                        star = "*" if latest_version and hub_version and hub_version < latest_version else ""
+                        text = f"{dep_name}({count}){star}"
+                        colored = f"{Colors.BLUE}{text}{Colors.END}"
+                    else:
+                        text = f"{dep_name}({count})"
+                        colored = f"{Colors.WHITE}{text}{Colors.END}"
+                    # Pad based on actual text length, not colored string
+                    padding = " " * max(0, col_width - len(text))
+                    row += colored + padding
+            print(row.rstrip())
+        print()
+
+    # Print low usage packages (1-2) in 3 columns
+    if low_usage:
+        print(f"{Colors.PURPLE}{Colors.BOLD}LOW USAGE (1-2 projects):{Colors.END}")
+        print(f"{Colors.GRAY}{'-' * 80}{Colors.END}")
+        col_width = 25
+        cols = 3
+        for i in range(0, len(low_usage), cols):
+            row = "  "
+            for j in range(cols):
+                if i + j < len(low_usage):
+                    dep_name, count, _ = low_usage[i + j]
+                    in_hub = dep_name in hub_deps
+                    if in_hub:
+                        hub_version = parse_version(hub_deps[dep_name])
+                        latest_version = parse_version(latest_cache.get(dep_name, ""))
+                        star = "*" if latest_version and hub_version and hub_version < latest_version else ""
+                        text = f"{dep_name}({count}){star}"
+                        colored = f"{Colors.BLUE}{text}{Colors.END}"
+                    else:
+                        text = f"{dep_name}({count})"
+                        colored = f"{Colors.GRAY}{text}{Colors.END}"
+                    # Pad based on actual text length, not colored string
+                    padding = " " * max(0, col_width - len(text))
+                    row += colored + padding
+            print(row.rstrip())
+        print()
+
+    # Calculate and show hub status at the bottom
+    hub_status = calculate_hub_status(package_consumers, hub_deps, latest_cache)
+    hub_current, hub_outdated, hub_unused, hub_gap_high, hub_unique = hub_status
+
+    print(f"{Colors.PURPLE}{Colors.BOLD}HUB STATUS:{Colors.END}")
+    col_width = 12
+
+    hub_labels = ["Current", "Outdated", "Gap", "Unused", "Unique"]
+    hub_values = [len(hub_current), len(hub_outdated), len(hub_gap_high), len(hub_unused), len(hub_unique)]
+    hub_colors = [Colors.BLUE, Colors.ORANGE, Colors.GREEN, Colors.RED, Colors.GRAY]
+
+    row = "  "
+    for label in hub_labels:
+        row += f"{label:<{col_width}}"
+    print(row)
+
+    row = "  "
+    for i, (value, color) in enumerate(zip(hub_values, hub_colors)):
+        text = str(value)
+        colored = f"{color}■{Colors.END} {color}{text}{Colors.END}"
+        # Calculate padding based on visible text (■ + space + number)
+        visible_len = 1 + 1 + len(text)  # block + space + number
+        padding = " " * (col_width - visible_len)
+        row += colored + padding
+    print(row)
+
 def main():
+    def signal_handler(signum, frame):
+        """Global signal handler for graceful exit"""
+        # Restore cursor visibility before exit
+        sys.stdout.write('\033[?25h')
+        # Try to restore terminal settings
+        try:
+            if sys.stdin.isatty():
+                # Reset terminal to normal mode
+                os.system('stty sane')
+        except:
+            pass
+        sys.stdout.flush()
+        print(f"\n{Colors.YELLOW}⚠️  Operation interrupted by user{Colors.END}")
+        sys.exit(0)
+
+    # Setup global signal handlers
+    signal.signal(signal.SIGINT, signal_handler)  # Ctrl+C
+    signal.signal(signal.SIGTERM, signal_handler)  # Termination
+    signal.signal(signal.SIGTSTP, signal_handler)  # Ctrl+Z
+
     parser = argparse.ArgumentParser(description="Rust dependency analyzer with enhanced commands")
     parser.add_argument('command', nargs='?', default='analyze',
-                       choices=['analyze', 'export', 'review', 'pkg', 'latest'],
+                       choices=['analyze', 'query', 'q', 'all', 'export', 'review', 'pkg', 'latest', 'hub'],
                        help='Command to run')
     parser.add_argument('package', nargs='?', help='Package name for pkg/latest commands')
 
@@ -506,9 +1146,19 @@ def main():
                 print(f"Usage: python deps.py pkg <package_name>")
                 sys.exit(1)
             analyze_package(dependencies, args.package)
-        else:  # default 'analyze'
+        elif args.command == 'all':
+            # Show all version conflicts (old analyze behavior)
             format_version_analysis(dependencies)
+        elif args.command == 'hub':
+            # Show hub package status
+            analyze_hub_status(dependencies)
+        else:  # default 'analyze', 'query', 'q'
+            # Show package usage analysis
+            analyze_package_usage(dependencies)
 
+    except KeyboardInterrupt:
+        print(f"\n{Colors.YELLOW}⚠️  Operation interrupted by user{Colors.END}")
+        sys.exit(0)
     except Exception as e:
         print(f"{Colors.RED}❌ Error: {e}{Colors.END}")
         sys.exit(1)
