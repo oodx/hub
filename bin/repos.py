@@ -86,6 +86,7 @@ class Colors:
     AMBER = '\x1B[38;5;220m'  # amber - golden orange
     EMERALD = '\x1B[38;5;34m' # emerald - pure green for success
     CRIMSON = '\x1B[38;5;196m' # crimson - pure red for critical errors
+    RED2 = '\x1B[38;5;124m'    # red2 - darker red for secondary breaking
 
     # Style modifiers
     BOLD = '\x1B[1m'
@@ -2480,7 +2481,7 @@ def view_review(ecosystem: EcosystemData) -> None:
 
     # Table header
     print(f"{Colors.WHITE}{Colors.BOLD}{'Package':<20} {'#U':<4} {'Ecosystem':<14} {'Latest':<20} {'Breaking'}{Colors.END}")
-    print(f"{Colors.GRAY}{'-'*105}{Colors.END}")
+    print(f"{Colors.GRAY}{'-'*85}{Colors.END}")
 
     # Collect all packages with usage stats, filtering out path/workspace deps and hub repo
     package_stats = {}
@@ -2559,46 +2560,45 @@ def view_review(ecosystem: EcosystemData) -> None:
             except:
                 pass
 
-        # Determine block color and breaking status like legacy
-        breaking_status = Colors.GREEN + "safe" + Colors.END
-        if ecosystem_version != latest_version:
+        # Determine breaking status with conflict indicators integrated
+        if ecosystem_version == latest_version:
+            breaking_status = f"{Colors.GRAY}current{Colors.END}"
+        elif has_conflicts:
+            if has_breaking:
+                breaking_status = f"{Colors.RED2}■ BREAKING{Colors.END}"  # RED2 for breaking + conflicts
+            else:
+                breaking_status = f"{Colors.YELLOW}■ CONFLICT{Colors.END}"
+        elif ecosystem_version != latest_version:
             try:
                 eco_major = ecosystem_version.split('.')[0] if '.' in ecosystem_version else ecosystem_version
                 latest_major = latest_version.split('.')[0] if '.' in latest_version else latest_version
                 if eco_major != latest_major and eco_major.isdigit() and latest_major.isdigit():
                     if int(latest_major) > int(eco_major):
-                        if has_conflicts:
-                            breaking_status = f"{Colors.RED}BREAKING{Colors.END}"
-                        else:
-                            breaking_status = f"{Colors.ORANGE}BREAKING{Colors.END}"
+                        breaking_status = f"{Colors.RED2}BREAKING{Colors.END}"  # RED2 for breaking without conflicts
+                    else:
+                        breaking_status = f"{Colors.GREEN}safe{Colors.END}"
+                else:
+                    breaking_status = f"{Colors.GREEN}safe{Colors.END}"
             except:
-                pass
+                breaking_status = f"{Colors.GREEN}safe{Colors.END}"
 
-        if ecosystem_version == latest_version:
-            breaking_status = Colors.GRAY + "current" + Colors.END
-
-        # Status icon like legacy
-        if has_conflicts:
-            if has_breaking:
-                icon = f"{Colors.RED}■{Colors.END}"
-                eco_color = Colors.RED
-            else:
-                icon = f"{Colors.RED}■{Colors.END}"
-                eco_color = Colors.RED
-        elif ecosystem_version != latest_version:
-            icon = f"{Colors.ORANGE}■{Colors.END}"
-            eco_color = Colors.ORANGE
+        # Ecosystem column color - simple update status only (no red conflicts)
+        if ecosystem_version != latest_version:
+            eco_color = Colors.ORANGE  # Outdated
         else:
-            icon = f"{Colors.GRAY}■{Colors.END}"
-            eco_color = Colors.GRAY
+            eco_color = Colors.GRAY    # Current
 
-        # Special cases for 0.x versions like legacy
-        if ecosystem_version.startswith("0."):
-            icon = f"{Colors.YELLOW}◐{Colors.END}"
+        # Format output with usage-based coloring for package names
+        usage_count = len(stats['repos'])
+        if usage_count >= 5:
+            pkg_color = Colors.WHITE  # High usage = bright white
+        elif usage_count >= 3:
+            pkg_color = Colors.LIGHT_GRAY  # Medium usage = light grey
+        else:
+            pkg_color = Colors.GRAY  # Low usage = grey
 
-        # Format output like legacy
-        pkg_display = f"{Colors.GRAY}{pkg_name:<20}{Colors.END}"
-        usage_display = f"{len(stats['repos']):<4}"
+        pkg_display = f"{pkg_color}{pkg_name:<20}{Colors.END}"
+        usage_display = f"{usage_count:<4}"
 
         # Format versions with color when different
         if ecosystem_version != latest_version:
@@ -2608,19 +2608,12 @@ def view_review(ecosystem: EcosystemData) -> None:
             eco_display = f"{Colors.GRAY}{ecosystem_version:<14}{Colors.END}"
             latest_display = f"{Colors.GRAY}{latest_version:<20}{Colors.END}"
 
-        print(f"{pkg_display} {usage_display} {icon} {eco_display} {latest_display} {breaking_status}")
+        print(f"{pkg_display} {usage_display} {eco_display} {latest_display} {breaking_status}")
 
-    # Legend like legacy
+    # Legend
     print(f"\n{Colors.PURPLE}{Colors.BOLD}Legend:{Colors.END}")
-    print(f"{Colors.GRAY}■{Colors.END} UPDATED   - Using latest version, no conflicts")
-    print(f"{Colors.ORANGE}■{Colors.END} OUTDATED  - Newer version available (safe update)")
-    print(f"{Colors.ORANGE}⚠{Colors.END} BREAKING  - Breaking change update available")
-    print(f"{Colors.RED}■{Colors.END} CONFLICT  - Multiple versions in ecosystem")
-    print(f"{Colors.RED}⚠{Colors.END} CRITICAL  - Breaking change conflicts")
-    print(f"{Colors.YELLOW}◐{Colors.END} UNSTABLE  - 0.x version (minor bumps can break)")
-    print(f"{Colors.YELLOW}◑{Colors.END} PREREL    - Pre-release version")
-    print()
-    print(f"Breaking: {Colors.RED}BREAKING{Colors.END} (conflicts), {Colors.ORANGE}BREAKING{Colors.END} (updates), {Colors.GREEN}safe{Colors.END}, {Colors.GRAY}current{Colors.END}")
+    print(f"Breaking: {Colors.RED2}■ BREAKING{Colors.END} (breaking + conflicts), {Colors.RED2}BREAKING{Colors.END} (breaking), {Colors.YELLOW}■ CONFLICT{Colors.END} (conflicts), {Colors.GREEN}safe{Colors.END}, {Colors.GRAY}current{Colors.END}")
+    print(f"Note: ■ = version conflicts in ecosystem")
     print(f"Versions: Only colored when {Colors.ORANGE}ecosystem{Colors.END} ≠ {Colors.CYAN}latest{Colors.END}")
 
 def view_query(ecosystem: EcosystemData) -> None:
