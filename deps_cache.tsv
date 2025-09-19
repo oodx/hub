@@ -2,7 +2,7 @@
 KEY	VALUE
 total_repos	20
 hub_using_repos	0
-total_deps	181
+total_deps	182
 total_packages	74
 git_packages	1
 local_packages	4
@@ -12,29 +12,29 @@ hub_current	2
 hub_outdated	10
 hub_gap	62
 hub_local	0
-breaking_updates	22
-safe_updates	123
-unknown_updates	8
+breaking_updates	23
+safe_updates	124
+unknown_updates	6
 stable_versions	88
-unstable_versions	88
+unstable_versions	91
 
 #------ SECTION : REPO LIST --------#
 REPO_ID	REPO_NAME	PATH	PARENT	LAST_UPDATE	CARGO_VERSION	HUB_USAGE	HUB_STATUS
 100	paintbox	oodx/projects/paintbox/Cargo.toml	projects	1757345459	0.0.1	NONE	none
 101	rolo	oodx/projects/rolo/Cargo.toml	projects	1757992816	0.2.2	NONE	none
 102	xstream	oodx/projects/xstream/Cargo.toml	projects	1757816419	0.2.0	NONE	none
-103	hub	oodx/projects/hub/Cargo.toml	projects	1758218753	0.1.0	NONE	none
+103	hub	oodx/projects/hub/Cargo.toml	projects	1758259752	0.2.0	NONE	none
 104	kick	oodx/projects/kick/Cargo.toml	projects	1757780024	0.1.0	NONE	none
-105	prontodb	oodx/projects/prontodb/Cargo.toml	projects	1757780232	0.7.0	NONE	none
-106	rsb	oodx/projects/rsb/Cargo.toml	projects	1758138852	0.5.0	NONE	none
+105	prontodb	oodx/projects/prontodb/Cargo.toml	projects	1758260549	0.7.0	NONE	none
+106	rsb	oodx/projects/rsb/Cargo.toml	projects	1758260133	0.5.0	NONE	none
 107	syntax	oodx/projects/syntax/Cargo.toml	projects	1757345437	0.1.0	NONE	none
 108	asc100	oodx/projects/asc100/Cargo.toml	projects	1757559858	0.3.0	NONE	none
 109	nox	oodx/projects/nox_server/Cargo.toml	projects	1758124390	0.1.0	NONE	none
 110	boxy	oodx/projects/boxy/Cargo.toml	projects	1758155903	0.15.0	NONE	none
 111	porty	oodx/projects/porty/Cargo.toml	projects	1757913075	0.1.0	NONE	none
 112	jynx	oodx/projects/jynx/Cargo.toml	projects	1758052755	2.0.0	NONE	none
-113	room_mvp	oodx/concepts/room/pilot/room_mvp/Cargo.toml	pilot	1758238544	0.1.0	NONE	none
-114	rolo	oodx/concepts/muxy/Cargo.toml	concepts	1758207589	0.1.1	NONE	none
+113	room_mvp	oodx/concepts/room/room/Cargo.toml	room	1758260529	0.1.0	NONE	none
+114	muxy	oodx/concepts/muxy/Cargo.toml	concepts	1758260846	0.1.1	NONE	none
 115	lab1	oodx/concepts/muxy/src/labs/lab1/Cargo.toml	labs	1757775531	0.1.0	NONE	none
 116	lab2	oodx/concepts/muxy/src/labs/lab2/Cargo.toml	labs	1757775534	0.1.0	NONE	none
 117	forge	oodx/concepts/forge/Cargo.toml	concepts	1758126739	0.0.0	NONE	none
@@ -108,7 +108,7 @@ DEP_ID	REPO_ID	PKG_NAME	PKG_VERSION	DEP_TYPE	FEATURES
 1062	105	tempfile	3	dep	NONE
 1063	105	serde	1	dep	derive
 1064	105	serde_json	1	dep	NONE
-1065	105	rsb	LOCAL	dep	visuals,stdopts
+1065	105	rsb	0.5.0	dep	visuals,stdopts
 1066	105	xstream	0.2.0	dep	NONE
 1067	105	zstd	0.13	dep	NONE
 1068	105	aes-gcm	0.10	dep	aes
@@ -193,37 +193,38 @@ DEP_ID	REPO_ID	PKG_NAME	PKG_VERSION	DEP_TYPE	FEATURES
 1147	112	clap	4.0	dep	derive
 1148	112	rsb	0.5.0	dep	NONE
 1149	112	criterion	0.7	dev-dep	NONE
-1150	113	rsb	0.5.0	dep	NONE
-1151	113	boxy	0.15.0	dep	NONE
-1152	113	crossterm	0.27	dep	NONE
-1153	113	blake3	1.5	dep	NONE
-1154	113	thiserror	1.0	dep	NONE
-1155	114	boxy	LOCAL	dep	NONE
-1156	114	unicode-width	0.2.1	dep	NONE
-1157	114	rsb	LOCAL	dep	visuals
-1158	114	libc	0.2	dep	NONE
-1159	115	rolo	LOCAL	dep	NONE
-1160	116	rolo	LOCAL	dep	NONE
-1161	117	rsb	0.5.0	dep	NONE
-1162	118	portable-pty	0.9	dep	NONE
-1163	118	tempfile	3.8	dep	NONE
-1164	118	chrono	0.4	dep	serde
-1165	118	clap	4.4	dep	derive
-1166	118	tokio	1.0	dep	full
-1167	118	serde	1.0	dep	derive
-1168	118	serde_json	1.0	dep	NONE
-1169	118	thiserror	2	dep	NONE
-1170	118	sha2	0.10	dep	NONE
-1171	118	hex	0.4	dep	NONE
-1172	118	rand	0.9	dep	NONE
-1173	119	portable-pty	0.9	dep	NONE
-1174	119	tempfile	3.8	dep	NONE
-1175	119	chrono	0.4	dep	serde
-1176	119	serde	1.0	dep	derive
-1177	119	serde_json	1.0	dep	NONE
-1178	119	thiserror	2	dep	NONE
-1179	119	rpassword	7.3	dep	NONE
-1180	119	which	6.0	dep	NONE
+1150	113	rsb	LOCAL	dep	NONE
+1151	113	crossterm	0.27	dep	NONE
+1152	113	blake3	1.5	dep	NONE
+1153	113	thiserror	1.0	dep	NONE
+1154	113	strip-ansi-escapes	0.2	dep	NONE
+1155	113	unicode-width	0.1	dep	NONE
+1156	114	boxy	0.15.0	dep	NONE
+1157	114	unicode-width	0.2.1	dep	NONE
+1158	114	rsb	0.5.0	dep	visuals
+1159	114	libc	0.2	dep	NONE
+1160	115	rolo	LOCAL	dep	NONE
+1161	116	rolo	LOCAL	dep	NONE
+1162	117	rsb	0.5.0	dep	NONE
+1163	118	portable-pty	0.9	dep	NONE
+1164	118	tempfile	3.8	dep	NONE
+1165	118	chrono	0.4	dep	serde
+1166	118	clap	4.4	dep	derive
+1167	118	tokio	1.0	dep	full
+1168	118	serde	1.0	dep	derive
+1169	118	serde_json	1.0	dep	NONE
+1170	118	thiserror	2	dep	NONE
+1171	118	sha2	0.10	dep	NONE
+1172	118	hex	0.4	dep	NONE
+1173	118	rand	0.9	dep	NONE
+1174	119	portable-pty	0.9	dep	NONE
+1175	119	tempfile	3.8	dep	NONE
+1176	119	chrono	0.4	dep	serde
+1177	119	serde	1.0	dep	derive
+1178	119	serde_json	1.0	dep	NONE
+1179	119	thiserror	2	dep	NONE
+1180	119	rpassword	7.3	dep	NONE
+1181	119	which	6.0	dep	NONE
 
 #------ SECTION : DEP LATEST LIST --------#
 PKG_ID	PKG_NAME	LATEST_VERSION	SOURCE_TYPE	SOURCE_VALUE	HUB_VERSION	HUB_STATUS
@@ -237,7 +238,7 @@ PKG_ID	PKG_NAME	LATEST_VERSION	SOURCE_TYPE	SOURCE_VALUE	HUB_VERSION	HUB_STATUS
 207	base64	0.22.1	crate	0.22	0.22	outdated
 208	bitflags	2.9.4	crate	2	NONE	gap
 209	blake3	1.8.2	crate	1.5	NONE	gap
-210	boxy	LOCAL	local	../../../../projects/boxy	NONE	gap
+210	boxy	LOCAL	local	../../projects/boxy	NONE	gap
 211	bytes	1.10.1	crate	1.0	NONE	gap
 212	chrono	0.4.42	crate	0.4	0.4	outdated
 213	clap	4.5.47	crate	4.0	NONE	gap
@@ -369,7 +370,7 @@ MAP_ID	DEP_ID	PKG_ID	REPO_ID	VERSION_STATE	BREAKING_TYPE	ECOSYSTEM_STATUS
 362	1062	258	105	stable	safe	normal
 363	1063	252	105	stable	safe	normal
 364	1064	253	105	stable	safe	normal
-365	1065	250	105	unknown	unknown	normal
+365	1065	250	105	unstable	current	normal
 366	1066	272	105	unstable	unknown	normal
 367	1067	273	105	unstable	safe	normal
 368	1068	200	105	unstable	BREAKING	normal
@@ -454,34 +455,35 @@ MAP_ID	DEP_ID	PKG_ID	REPO_ID	VERSION_STATE	BREAKING_TYPE	ECOSYSTEM_STATUS
 447	1147	213	112	stable	safe	normal
 448	1148	250	112	unstable	current	normal
 449	1149	215	112	unstable	current	normal
-450	1150	250	113	unstable	current	normal
-451	1151	210	113	unstable	unknown	normal
-452	1152	216	113	unstable	BREAKING	normal
-453	1153	209	113	stable	safe	normal
-454	1154	259	113	stable	BREAKING	normal
-455	1155	210	114	unknown	unknown	normal
-456	1156	266	114	unstable	current	normal
-457	1157	250	114	unknown	unknown	normal
-458	1158	231	114	unstable	BREAKING	normal
-459	1159	248	115	unknown	unknown	normal
-460	1160	248	116	unknown	unknown	normal
-461	1161	250	117	unstable	current	normal
-462	1162	241	118	unstable	current	normal
-463	1163	258	118	stable	safe	normal
-464	1164	212	118	unstable	safe	normal
-465	1165	213	118	stable	safe	normal
-466	1166	260	118	stable	safe	normal
-467	1167	252	118	stable	safe	normal
-468	1168	253	118	stable	safe	normal
-469	1169	259	118	stable	safe	normal
-470	1170	255	118	unstable	BREAKING	normal
-471	1171	224	118	unstable	safe	normal
-472	1172	244	118	unstable	BREAKING	normal
-473	1173	241	119	unstable	current	normal
-474	1174	258	119	stable	safe	normal
-475	1175	212	119	unstable	safe	normal
-476	1176	252	119	stable	safe	normal
-477	1177	253	119	stable	safe	normal
-478	1178	259	119	stable	safe	normal
-479	1179	249	119	stable	safe	normal
-480	1180	270	119	stable	BREAKING	normal
+450	1150	250	113	unknown	unknown	normal
+451	1151	216	113	unstable	BREAKING	normal
+452	1152	209	113	stable	safe	normal
+453	1153	259	113	stable	BREAKING	normal
+454	1154	257	113	unstable	safe	normal
+455	1155	266	113	unstable	BREAKING	normal
+456	1156	210	114	unstable	unknown	normal
+457	1157	266	114	unstable	current	normal
+458	1158	250	114	unstable	current	normal
+459	1159	231	114	unstable	BREAKING	normal
+460	1160	248	115	unknown	unknown	normal
+461	1161	248	116	unknown	unknown	normal
+462	1162	250	117	unstable	current	normal
+463	1163	241	118	unstable	current	normal
+464	1164	258	118	stable	safe	normal
+465	1165	212	118	unstable	safe	normal
+466	1166	213	118	stable	safe	normal
+467	1167	260	118	stable	safe	normal
+468	1168	252	118	stable	safe	normal
+469	1169	253	118	stable	safe	normal
+470	1170	259	118	stable	safe	normal
+471	1171	255	118	unstable	BREAKING	normal
+472	1172	224	118	unstable	safe	normal
+473	1173	244	118	unstable	BREAKING	normal
+474	1174	241	119	unstable	current	normal
+475	1175	258	119	stable	safe	normal
+476	1176	212	119	unstable	safe	normal
+477	1177	252	119	stable	safe	normal
+478	1178	253	119	stable	safe	normal
+479	1179	259	119	stable	safe	normal
+480	1180	249	119	stable	safe	normal
+481	1181	270	119	stable	BREAKING	normal

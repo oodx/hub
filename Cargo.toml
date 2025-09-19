@@ -91,3 +91,6 @@ predicates = "3.0"
 [lib]
 name = "hub"
 path = "src/lib.rs"
+
+[package.metadata.hub]
+# Custom hub metadata section for hub configuration
