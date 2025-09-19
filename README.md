@@ -26,50 +26,43 @@ use hub::prelude::*;
 
 Hub provides powerful commands for ecosystem-wide analysis and management:
 
-### ⚡ Fast View Commands (100x+ Performance)
+### 🚀 View Commands (Default 100x+ Performance)
 ```bash
-# Lightning-fast analysis using TSV cache - 100x+ performance improvement!
-# These commands use pre-computed data for instant results
+# All view commands now use TSV cache for instant 100x+ performance
 
-# Version conflict analysis (default fast view)
-./bin/repos.py fast --conflicts
-./bin/repos.py --conflicts              # Auto-detected fast mode
+# Display quick ecosystem statistics
+./bin/repos.py stats
 
-# Package usage analysis
-./bin/repos.py fast --query
-./bin/repos.py --query                  # Auto-detected fast mode
+# Show dependencies of a specific repository
+./bin/repos.py deps <repo>
 
-# Ecosystem dependency review
-./bin/repos.py fast --review
-./bin/repos.py --review                 # Auto-detected fast mode
+# List packages with available updates
+./bin/repos.py outdated
 
-# Hub-centric dashboard
-./bin/repos.py fast --hub-dashboard
-./bin/repos.py --hub-dashboard          # Auto-detected fast mode
+# Fuzzy search for package names
+./bin/repos.py search <pattern>
 
-# Detailed package analysis
-./bin/repos.py fast --pkg-detail <package-name>
-./bin/repos.py --pkg-detail <package-name>    # Auto-detected fast mode
+# Show dependency graph for a package
+./bin/repos.py graph <package>
 
-# Default fast view (conflicts analysis)
-./bin/repos.py fast
+# Existing view commands (now using default fast mode)
+./bin/repos.py conflicts
+./bin/repos.py query
+./bin/repos.py review
+./bin/repos.py hub
+./bin/repos.py pkg <package-name>
 ```
 
-### Traditional Analysis Commands
+### Additional Commands
 ```bash
-# Default repository and dependency analysis with package usage overview
-./bin/repos.py
-
-# Alternative query commands (same functionality)
-./bin/repos.py query
-./bin/repos.py q
-
 # Comprehensive ecosystem analysis
 ./bin/repos.py all
 
-# Detailed review with latest version checking
-./bin/repos.py review
-./bin/repos.py eco       # Extended ecosystem view
+# Check latest version for a specific package
+./bin/repos.py latest <package-name>
+
+# Export raw repository and dependency data
+./bin/repos.py export
 ```
 
 ### Data Cache System & Fast View Engine
@@ -187,33 +180,37 @@ Hub intelligently handles git dependencies with LOCAL flag detection:
 
 ## Examples
 
-### Fast View Commands
+### View Commands
 ```bash
-# Start with generating the cache for 100x+ performance
+# Generate cache for enhanced performance (optional)
 ./bin/repos.py data
 
-# Version conflict analysis (instant results)
-./bin/repos.py --conflicts
-# Output: Color-coded conflict analysis with breaking change detection
+# Ecosystem Statistics
+./bin/repos.py stats
+# Output: Quick overview of dependencies, repos, and package usage
 
-# Package usage analysis (instant results)
-./bin/repos.py --query
-# Output: Three-tier usage analysis (high/medium/low) with hub integration
+# Dependency Details
+./bin/repos.py deps hub
+# Output: Complete dependencies for the 'hub' repository
 
-# Ecosystem dependency review (instant results)
-./bin/repos.py --review
-# Output: Complete dependency overview with version analysis
+# Outdated Packages
+./bin/repos.py outdated
+# Output: Packages with available updates
 
-# Hub-centric dashboard (instant results)
-./bin/repos.py --hub-dashboard
-# Output: Hub package status and ecosystem integration metrics
+# Package Search
+./bin/repos.py search regex
+# Output: Fuzzy-matched packages containing 'regex'
 
-# Detailed package analysis (instant results)
-./bin/repos.py --pkg-detail serde
-# Output: Complete package usage, version conflicts, and repository mapping
+# Package Dependency Graph
+./bin/repos.py graph serde
+# Output: Comprehensive dependency relationships for 'serde'
 
-# Default fast view (conflicts)
-./bin/repos.py fast
+# Existing Commands (Now with TSV Cache)
+./bin/repos.py conflicts    # Version conflict analysis
+./bin/repos.py query        # Package usage analysis
+./bin/repos.py review       # Ecosystem dependency review
+./bin/repos.py hub          # Hub-centric dashboard
+./bin/repos.py pkg serde    # Detailed package analysis
 ```
 
 ### Basic Usage
@@ -253,7 +250,7 @@ fn parse_log_entry(line: &str) -> Result<LogEntry, serde_json::Error> {
 - ✅ **Simplified dependencies** - Only specify features, not versions
 - ✅ **Easy ecosystem upgrades** - One place to update all versions
 - ✅ **Consistent behavior** - Same crate versions everywhere
-- ⚡ **Lightning-fast analysis** - 100x+ performance with fast view commands
+- ⚡ **Default Lightning-fast Analysis** - 100x+ performance for all view commands
 - 🔍 **Deep analysis** - Comprehensive repository and dependency insights
 - 🎨 **Enhanced UX** - Color-coded outputs with proper hub status semantics
 - 🧹 **Repository management** - Superclean operations and automated maintenance
@@ -403,7 +400,8 @@ Hub has evolved from a simple dependency analyzer to a comprehensive repository 
 - **Phase 4**: Repository operations (superclean, git resolution) with progress bars
 - **Phase 5**: Fast view system with 100x+ performance improvements (current)
 - **Phase 6**: Enhanced UX with auto-detection and color-coded outputs (current)
-- **Phase 7**: Coming - `tap` command for git status/auto-commit across repos
+- **Phase 7**: Comprehensive view commands with rich ecosystem analytics
+- **Phase 8**: Coming - `tap` command for git status/auto-commit across repos
 
 ## Version Compatibility
 
