@@ -2624,11 +2624,16 @@ def view_query(ecosystem: EcosystemData) -> None:
     print(f"{Colors.PURPLE}{Colors.BOLD}📊 PACKAGE USAGE ANALYSIS{Colors.END}")
     print(f"{Colors.PURPLE}{'='*80}{Colors.END}\n")
 
-    # Get hub dependencies like legacy does
+    # Get hub packages from the new data model
     hub_deps = {}
     for pkg_name, latest_info in ecosystem.latest.items():
-        if latest_info.hub_status != 'NONE':
-            hub_deps[pkg_name] = latest_info.hub_version
+        # Check if package is in hub (status is 'current' or 'outdated')
+        if latest_info.hub_status in ['current', 'outdated']:
+            hub_deps[pkg_name] = {
+                'version': latest_info.hub_version,
+                'status': latest_info.hub_status,
+                'latest': latest_info.latest_version
+            }
 
     # Collect usage stats, filtering out path/workspace deps and hub repo like legacy
     package_consumers = {}
@@ -2677,14 +2682,9 @@ def view_query(ecosystem: EcosystemData) -> None:
     medium_usage.sort(key=sort_key)
     low_usage.sort(key=sort_key)
 
-    # Print summary like legacy
-    print(f"{Colors.PURPLE}{Colors.BOLD}SUMMARY:{Colors.END}")
-    print(f"  {'High':<12}{'Med':<12}{'Low':<12}{'Total':<12}")
-    print(f"  {Colors.WHITE}{len(high_usage):<11}{len(medium_usage):<11}{Colors.GRAY}{len(low_usage):<11}{Colors.END}{Colors.BOLD}{len(package_consumers):<11}{Colors.END}")
-
-    # Print high usage packages like legacy
+    # Print high usage packages with count in header
     if high_usage:
-        print(f"\n{Colors.PURPLE}{Colors.BOLD}HIGH USAGE (5+ projects):{Colors.END}")
+        print(f"\n{Colors.PURPLE}{Colors.BOLD}HIGH USAGE (5+ projects) - {len(high_usage)} packages:{Colors.END}")
         print(f"{Colors.GRAY}{'-'*80}{Colors.END}")
         col_width = 25
         cols = 3
@@ -2695,22 +2695,35 @@ def view_query(ecosystem: EcosystemData) -> None:
                     pkg_name, count, _ = high_usage[i + j]
                     in_hub = pkg_name in hub_deps
                     if in_hub:
-                        # Check if hub version is outdated
-                        hub_version = hub_deps[pkg_name]
-                        latest_info = ecosystem.latest.get(pkg_name)
-                        latest_version = latest_info.latest_version if latest_info else ""
-                        star = "*" if latest_version and hub_version != latest_version else ""
-                        text = f"{pkg_name}({count}){star}"
-                        colored = f"{Colors.BLUE}{text}{Colors.END}"
+                        # Check hub status for proper coloring
+                        hub_info = hub_deps[pkg_name]
+                        if hub_info['status'] == 'current':
+                            # Current - blue
+                            text = f"{pkg_name}({count})"
+                            colored = f"{Colors.BLUE}{text}{Colors.END}"
+                        else:
+                            # Outdated - yellow/orange
+                            text = f"{pkg_name}({count})*"
+                            colored = f"{Colors.YELLOW}{text}{Colors.END}"
                     else:
-                        text = f"{pkg_name}({count})*"
-                        colored = f"{Colors.BLUE}{text}{Colors.END}"
-                    row += f"{colored:<{col_width + 15}}"  # Account for color codes
-            print(row)
+                        # Not in hub - green if high usage (5+), grey if low usage (1-2), normal for medium (3-4)
+                        if count >= 5:
+                            text = f"{pkg_name}({count})*"
+                            colored = f"{Colors.GREEN}{text}{Colors.END}"  # Gap package (opportunity)
+                        elif count <= 2:
+                            text = f"{pkg_name}({count})*"
+                            colored = f"{Colors.GRAY}{text}{Colors.END}"   # Unique package (low priority)
+                        else:
+                            text = f"{pkg_name}({count})*"
+                            colored = f"{Colors.WHITE}{text}{Colors.END}"  # Medium usage, not categorized"
+                    # Pad based on actual text length, not colored string
+                    padding = " " * max(0, col_width - len(text))
+                    row += colored + padding
+            print(row.rstrip())
 
-    # Print medium usage packages like legacy
+    # Print medium usage packages with count in header
     if medium_usage:
-        print(f"\n{Colors.PURPLE}{Colors.BOLD}MEDIUM USAGE (3-4 projects):{Colors.END}")
+        print(f"\n{Colors.PURPLE}{Colors.BOLD}MEDIUM USAGE (3-4 projects) - {len(medium_usage)} packages:{Colors.END}")
         print(f"{Colors.GRAY}{'-'*80}{Colors.END}")
         col_width = 25
         cols = 3
@@ -2721,22 +2734,35 @@ def view_query(ecosystem: EcosystemData) -> None:
                     pkg_name, count, _ = medium_usage[i + j]
                     in_hub = pkg_name in hub_deps
                     if in_hub:
-                        # Check if hub version is outdated
-                        hub_version = hub_deps[pkg_name]
-                        latest_info = ecosystem.latest.get(pkg_name)
-                        latest_version = latest_info.latest_version if latest_info else ""
-                        star = "*" if latest_version and hub_version != latest_version else ""
-                        text = f"{pkg_name}({count}){star}"
-                        colored = f"{Colors.BLUE}{text}{Colors.END}"
+                        # Check hub status for proper coloring
+                        hub_info = hub_deps[pkg_name]
+                        if hub_info['status'] == 'current':
+                            # Current - blue
+                            text = f"{pkg_name}({count})"
+                            colored = f"{Colors.BLUE}{text}{Colors.END}"
+                        else:
+                            # Outdated - yellow/orange
+                            text = f"{pkg_name}({count})*"
+                            colored = f"{Colors.YELLOW}{text}{Colors.END}"
                     else:
-                        text = f"{pkg_name}({count})*"
-                        colored = f"{Colors.WHITE}{text}{Colors.END}"
-                    row += f"{colored:<{col_width + 15}}"  # Account for color codes
-            print(row)
+                        # Not in hub - green if high usage (5+), grey if low usage (1-2), normal for medium (3-4)
+                        if count >= 5:
+                            text = f"{pkg_name}({count})*"
+                            colored = f"{Colors.GREEN}{text}{Colors.END}"  # Gap package (opportunity)
+                        elif count <= 2:
+                            text = f"{pkg_name}({count})*"
+                            colored = f"{Colors.GRAY}{text}{Colors.END}"   # Unique package (low priority)
+                        else:
+                            text = f"{pkg_name}({count})*"
+                            colored = f"{Colors.WHITE}{text}{Colors.END}"  # Medium usage, not categorized"
+                    # Pad based on actual text length, not colored string
+                    padding = " " * max(0, col_width - len(text))
+                    row += colored + padding
+            print(row.rstrip())
 
-    # Print low usage packages like legacy
+    # Print low usage packages with count in header
     if low_usage:
-        print(f"\n{Colors.PURPLE}{Colors.BOLD}LOW USAGE (1-2 projects):{Colors.END}")
+        print(f"\n{Colors.PURPLE}{Colors.BOLD}LOW USAGE (1-2 projects) - {len(low_usage)} packages:{Colors.END}")
         print(f"{Colors.GRAY}{'-'*80}{Colors.END}")
         col_width = 25
         cols = 3
@@ -2747,38 +2773,74 @@ def view_query(ecosystem: EcosystemData) -> None:
                     pkg_name, count, _ = low_usage[i + j]
                     in_hub = pkg_name in hub_deps
                     if in_hub:
-                        # Check if hub version is outdated
-                        hub_version = hub_deps[pkg_name]
-                        latest_info = ecosystem.latest.get(pkg_name)
-                        latest_version = latest_info.latest_version if latest_info else ""
-                        star = "*" if latest_version and hub_version != latest_version else ""
-                        text = f"{pkg_name}({count}){star}"
-                        colored = f"{Colors.BLUE}{text}{Colors.END}"
+                        # Check hub status for proper coloring
+                        hub_info = hub_deps[pkg_name]
+                        if hub_info['status'] == 'current':
+                            # Current - blue
+                            text = f"{pkg_name}({count})"
+                            colored = f"{Colors.BLUE}{text}{Colors.END}"
+                        else:
+                            # Outdated - yellow/orange
+                            text = f"{pkg_name}({count})*"
+                            colored = f"{Colors.YELLOW}{text}{Colors.END}"
                     else:
+                        # Gap package for low usage - grey (less important)
                         text = f"{pkg_name}({count})*"
                         colored = f"{Colors.GRAY}{text}{Colors.END}"
-                    row += f"{colored:<{col_width + 15}}"  # Account for color codes
-            print(row)
+                    # Pad based on actual text length, not colored string
+                    padding = " " * max(0, col_width - len(text))
+                    row += colored + padding
+            print(row.rstrip())
 
-    # Hub status summary like legacy
+    # Hub status summary - calculate properly
     hub_current = 0
     hub_outdated = 0
-    hub_gap = 0
-    hub_unused = 0
-    hub_unique = len([pkg for pkg in hub_deps.keys() if pkg not in package_consumers])
+    hub_gap = 0  # Packages with 5+ usage not in hub
+    hub_unused = 0  # Hub packages with 0 usage in ecosystem
+    hub_unique = 0  # Hub packages not used by any other repo
 
-    for pkg_name in hub_deps.keys():
+    # Count hub packages by status
+    for pkg_name, hub_info in hub_deps.items():
         if pkg_name in package_consumers:
-            latest_info = ecosystem.latest.get(pkg_name)
-            if latest_info:
-                if latest_info.hub_version == latest_info.latest_version:
-                    hub_current += 1
-                else:
-                    hub_outdated += 1
+            # Package is used in ecosystem
+            if hub_info['status'] == 'current':
+                hub_current += 1
+            else:
+                hub_outdated += 1
+        else:
+            # Hub package not used in ecosystem at all
+            hub_unique += 1
 
-    print(f"\n{Colors.PURPLE}{Colors.BOLD}HUB STATUS:{Colors.END}")
+    # Count gap and unique packages
+    gap_packages = 0
+    unique_packages = 0
+
+    for pkg_name, repo_set in package_consumers.items():
+        if pkg_name not in hub_deps:
+            usage_count = len(repo_set)
+            if usage_count >= 5:
+                gap_packages += 1  # High value opportunities (missing from hub)
+            elif usage_count <= 2:
+                unique_packages += 1  # Low usage packages (not hub-worthy)
+            # Medium usage (3-4) packages not in hub are neither gap nor unique
+
+    hub_gap = gap_packages
+    # hub_unused is already calculated above (hub packages with zero ecosystem usage)
+    hub_unique = unique_packages  # Low usage packages not in hub
+
+    total_packages = len(package_consumers)
+    print(f"\n{Colors.PURPLE}{Colors.BOLD}HUB STATUS - {total_packages} total packages:{Colors.END}")
     print(f"  {'Current':<12}{'Outdated':<12}{'Gap':<12}{'Unused':<12}{'Unique':<12}")
     print(f"  {Colors.BLUE}■{Colors.END} {Colors.BLUE}{hub_current:<9}{Colors.END} {Colors.ORANGE}■{Colors.END} {Colors.ORANGE}{hub_outdated:<9}{Colors.END} {Colors.GREEN}■{Colors.END} {Colors.GREEN}{hub_gap:<9}{Colors.END} {Colors.RED}■{Colors.END} {Colors.RED}{hub_unused:<9}{Colors.END} {Colors.GRAY}■{Colors.END} {Colors.GRAY}{hub_unique}{Colors.END}")
+
+    # Print opportunity packages (high usage not in hub)
+    opportunity_packages = [pkg for pkg, count, _ in high_usage if pkg not in hub_deps and count >= 5]
+    if opportunity_packages:
+        print(f"\n{Colors.PURPLE}{Colors.BOLD}OPPORTUNITY PACKAGES (5+ usage, not in hub):{Colors.END}")
+        print(f"{Colors.GRAY}{'-'*80}{Colors.END}")
+        for pkg in opportunity_packages:
+            count = len(package_consumers[pkg])
+            print(f"  {Colors.GREEN}{pkg}({count}){Colors.END}")
 
 def discover_repositories(force_live=False):
     """Discover repository paths using cache or live discovery
