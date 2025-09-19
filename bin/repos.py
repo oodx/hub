@@ -3126,17 +3126,12 @@ def main():
     signal.signal(signal.SIGTSTP, signal_handler)  # Ctrl+Z
 
     parser = argparse.ArgumentParser(description="Rust dependency analyzer with enhanced commands")
-    parser.add_argument('command', nargs='?', default='analyze',
-                       choices=['analyze', 'query', 'q', 'all', 'export', 'eco', 'review', 'pkg', 'latest', 'hub', 'data', 'superclean', 'tap', 'ssh-test', 'ls', 'fast'],
+    parser.add_argument('command', nargs='?', default='conflicts',
+                       choices=['conflicts', 'query', 'review', 'hub', 'pkg', 'export', 'data', 'superclean', 'ls', 'legacy'],
                        help='Command to run')
     parser.add_argument('package', nargs='?', help='Package name for pkg/latest commands')
     parser.add_argument('--ssh-profile', default=None, help='SSH profile/host for git operations (e.g., "qodeninja" for git@qodeninja)')
     parser.add_argument('--live', action='store_true', help='Force live discovery instead of using cache')
-    parser.add_argument('--conflicts', action='store_true', help='Show version conflicts (fast command)')
-    parser.add_argument('--pkg-detail', default=None, help='Show package details (fast command)')
-    parser.add_argument('--hub-dashboard', action='store_true', help='Show hub dashboard (fast command)')
-    parser.add_argument('--review', action='store_true', help='Show ecosystem dependency review (fast command)')
-    parser.add_argument('--query', action='store_true', help='Show package usage analysis (fast command)')
     parser.add_argument('--fast-mode', action='store_true', help='Disable progress bars and interactive elements')
 
     args = parser.parse_args()
