@@ -2139,7 +2139,8 @@ def view_conflicts(ecosystem: EcosystemData) -> None:
 
     Replaces format_version_analysis() with ~100x performance improvement
     """
-    print(f"{Colors.CYAN}{Colors.BOLD}⚡ Fast Conflict Analysis{Colors.END}")
+    print(f"{Colors.CYAN}{Colors.BOLD}🔍 VERSION CONFLICT ANALYSIS{Colors.END}")
+    print(f"{Colors.CYAN}{'='*80}{Colors.END}")
 
     conflicts = {}
 
@@ -2161,19 +2162,23 @@ def view_conflicts(ecosystem: EcosystemData) -> None:
                         if len(set(item['version'] for item in v)) > 1}
 
     if not conflict_packages:
-        print(f"{Colors.GREEN}✅ No version conflicts found in ecosystem!{Colors.END}")
+        print(f"\n{Colors.GREEN}✅ No version conflicts found in ecosystem!{Colors.END}")
         return
 
-    print(f"\n{Colors.RED}Found {len(conflict_packages)} packages with version conflicts:{Colors.END}")
+    print(f"\n{Colors.RED}📊 Found {len(conflict_packages)} packages with version conflicts:{Colors.END}")
 
-    for pkg_name, usages in conflict_packages.items():
+    # Sort by package name for consistent output
+    for pkg_name in sorted(conflict_packages.keys()):
+        usages = conflict_packages[pkg_name]
         versions = set(item['version'] for item in usages)
         latest_info = ecosystem.latest.get(pkg_name)
         latest_version = latest_info.latest_version if latest_info else "unknown"
 
-        print(f"\n{Colors.YELLOW}{Colors.BOLD}{pkg_name}{Colors.END} (latest: {latest_version})")
+        print(f"\n{Colors.YELLOW}{Colors.BOLD}📦 {pkg_name}{Colors.END} (latest: {Colors.GREEN}{latest_version}{Colors.END})")
+        print(f"{Colors.GRAY}   {'Version':<15} Repositories{Colors.END}")
+        print(f"{Colors.GRAY}   {'-'*50}{Colors.END}")
 
-        # Group by version for cleaner display
+        # Group by version for structured display
         by_version = {}
         for usage in usages:
             ver = usage['version']
@@ -2181,19 +2186,40 @@ def view_conflicts(ecosystem: EcosystemData) -> None:
                 by_version[ver] = []
             by_version[ver].append(usage)
 
-        for version in sorted(by_version.keys()):
-            repos_using = by_version[version]
-            repo_names = [f"{item['repo']}" for item in repos_using]
-            dep_types = set(item['type'] for item in repos_using)
+        # Sort versions (handle different version formats)
+        try:
+            sorted_versions = sorted(by_version.keys(), key=lambda x: [int(i) if i.isdigit() else i for i in x.split('.')])
+        except:
+            sorted_versions = sorted(by_version.keys())
 
-            print(f"  {Colors.BLUE}{version}{Colors.END} → {', '.join(repo_names)} ({', '.join(dep_types)})")
+        for version in sorted_versions:
+            repos_using = by_version[version]
+            repo_names = sorted([f"{item['repo']}" for item in repos_using])
+            dep_types = sorted(set(item['type'] for item in repos_using))
+
+            # Color code version based on currency
+            version_color = Colors.GREEN if version == latest_version else Colors.YELLOW if 'LOCAL' not in version else Colors.BLUE
+
+            version_str = f"{version_color}{version:<15}{Colors.END}"
+            repo_str = f"{Colors.WHITE}{', '.join(repo_names)}{Colors.END}"
+            type_str = f"{Colors.GRAY}({', '.join(dep_types)}){Colors.END}"
+
+            print(f"   {version_str} {repo_str} {type_str}")
+
+    # Summary statistics
+    total_conflicts = sum(len(set(item['version'] for item in usages)) for usages in conflict_packages.values())
+    print(f"\n{Colors.PURPLE}{Colors.BOLD}Conflict Summary:{Colors.END}")
+    print(f"  Packages with conflicts: {Colors.BOLD}{len(conflict_packages)}{Colors.END}")
+    print(f"  Total version variants: {Colors.BOLD}{total_conflicts}{Colors.END}")
+    print(f"  Ecosystem health: {Colors.YELLOW}⚠️  Requires attention{Colors.END}")
 
 def view_package_detail(ecosystem: EcosystemData, pkg_name: str) -> None:
     """Lightning-fast package analysis using hydrated data
 
     Replaces analyze_package() with instant lookup performance
     """
-    print(f"{Colors.CYAN}{Colors.BOLD}⚡ Fast Package Analysis: {pkg_name}{Colors.END}")
+    print(f"{Colors.CYAN}{Colors.BOLD}📦 PACKAGE ANALYSIS: {pkg_name}{Colors.END}")
+    print(f"{Colors.CYAN}{'='*60}{Colors.END}")
 
     if pkg_name not in ecosystem.latest:
         print(f"{Colors.RED}❌ Package '{pkg_name}' not found in ecosystem{Colors.END}")
@@ -2208,17 +2234,13 @@ def view_package_detail(ecosystem: EcosystemData, pkg_name: str) -> None:
         print(f"{Colors.YELLOW}⚠️  Package found in latest versions but not used in any repos{Colors.END}")
         return
 
-    # Package overview
-    print(f"\n{Colors.WHITE}{Colors.BOLD}Package Overview:{Colors.END}")
-    print(f"  📦 Latest Version: {Colors.GREEN}{latest_info.latest_version}{Colors.END}")
-    print(f"  🏷️  Source Type: {latest_info.source_type}")
-    print(f"  🎯 Hub Status: {latest_info.hub_status}")
-    print(f"  📊 Used in: {len(usages)} dependencies across {len(set(dep.repo_id for dep in usages))} repositories")
+    print(f"\n{Colors.CYAN}Latest on crates.io: {Colors.BOLD}{latest_info.latest_version}{Colors.END}")
 
-    # Usage breakdown
-    print(f"\n{Colors.WHITE}{Colors.BOLD}Usage Details:{Colors.END}")
+    # Table header matching legacy format
+    print(f"\n{Colors.WHITE}{Colors.BOLD}Version      Type   Parent.Repo               Status{Colors.END}")
+    print(f"{Colors.GRAY}------------------------------------------------------------{Colors.END}")
 
-    # Group by repository
+    # Group by repository and format like legacy
     by_repo = {}
     for dep in usages:
         repo_id = dep.repo_id
@@ -2226,28 +2248,48 @@ def view_package_detail(ecosystem: EcosystemData, pkg_name: str) -> None:
             by_repo[repo_id] = []
         by_repo[repo_id].append(dep)
 
-    for repo_id, repo_deps in by_repo.items():
+    # Build table rows
+    for repo_id, repo_deps in sorted(by_repo.items()):
         repo = ecosystem.repos[repo_id]
-        versions = set(dep.pkg_version for dep in repo_deps)
-        dep_types = set(dep.dep_type for dep in repo_deps)
 
-        # Show version status
-        version_str = ', '.join(versions)
-        if len(versions) == 1 and list(versions)[0] == latest_info.latest_version:
-            version_color = Colors.GREEN
-            status = "✅"
-        else:
-            version_color = Colors.YELLOW
-            status = "⚠️"
+        for dep in repo_deps:
+            # Format version (left-aligned, 12 chars)
+            version_str = f"{dep.pkg_version:<12}"
 
-        print(f"  {status} {Colors.BOLD}{repo.repo_name}{Colors.END} → {version_color}{version_str}{Colors.END} ({', '.join(dep_types)})")
+            # Format dependency type (left-aligned, 6 chars)
+            dep_type_str = f"{dep.dep_type:<6}"
+
+            # Format repo name with proper prefix like legacy (left-aligned, 25 chars)
+            repo_full_name = f"projects.{repo.repo_name}" if repo.repo_name != "hub" else f"projects.{repo.repo_name}"
+            repo_name_str = f"{repo_full_name:<25}"
+
+            # Status - simplified to ONLY for now (matches legacy output)
+            status_str = "ONLY"
+
+            print(f"{Colors.WHITE}{version_str} {dep_type_str} {repo_name_str} {status_str}{Colors.END}")
+
+    # Summary section matching legacy format
+    versions_in_use = set(dep.pkg_version for dep in usages)
+    repos_using = len(set(dep.repo_id for dep in usages))
+
+    print(f"\n{Colors.PURPLE}{Colors.BOLD}Summary for {pkg_name}:{Colors.END}")
+    print(f"Versions in ecosystem: {Colors.BOLD}{len(versions_in_use)}{Colors.END}")
+    print(f"Total usage count: {Colors.BOLD}{len(usages)}{Colors.END}")
+    print(f"Repositories using: {Colors.BOLD}{repos_using}{Colors.END}")
+
+    # Check for version conflicts
+    if len(versions_in_use) == 1:
+        print(f"{Colors.GREEN}✅ No version conflicts{Colors.END}")
+    else:
+        print(f"{Colors.YELLOW}⚠️  Version conflicts detected{Colors.END}")
 
 def view_hub_dashboard(ecosystem: EcosystemData) -> None:
     """Lightning-fast hub-centric analysis using hydrated data
 
     Replaces analyze_hub_status() with pre-computed hub metrics
     """
-    print(f"{Colors.CYAN}{Colors.BOLD}⚡ Fast Hub Dashboard{Colors.END}")
+    print(f"{Colors.PURPLE}{Colors.BOLD}🎯 HUB PACKAGE STATUS{Colors.END}")
+    print(f"{Colors.PURPLE}{'='*80}{Colors.END}")
 
     # Get hub packages (packages with hub status)
     hub_packages = {name: info for name, info in ecosystem.latest.items()
@@ -2257,40 +2299,103 @@ def view_hub_dashboard(ecosystem: EcosystemData) -> None:
         print(f"{Colors.YELLOW}⚠️  No hub packages found in ecosystem{Colors.END}")
         return
 
-    # Hub overview from aggregation metrics
-    agg = ecosystem.aggregation
-    print(f"\n{Colors.WHITE}{Colors.BOLD}Hub Overview:{Colors.END}")
-    print(f"  📦 Total Packages: {agg.get('total_packages', '?')}")
-    print(f"  🏠 Hub Packages: {len(hub_packages)}")
-    print(f"  📊 Hub Coverage: {(len(hub_packages) / int(agg.get('total_packages', 1)) * 100):.1f}%")
+    # Separate packages by status
+    current_packages = []
+    outdated_packages = []
+    gap_packages = []
 
-    # Status breakdown
-    status_counts = {}
-    for pkg_info in hub_packages.values():
-        status = pkg_info.hub_status
-        status_counts[status] = status_counts.get(status, 0) + 1
-
-    print(f"\n{Colors.WHITE}{Colors.BOLD}Hub Status Breakdown:{Colors.END}")
-    for status, count in sorted(status_counts.items()):
-        color = Colors.GREEN if status == 'current' else Colors.YELLOW if status == 'outdated' else Colors.RED
-        print(f"  {color}{status.title()}: {count} packages{Colors.END}")
-
-    # Package details
-    print(f"\n{Colors.WHITE}{Colors.BOLD}Hub Package Details:{Colors.END}")
-
-    for pkg_name, pkg_info in sorted(hub_packages.items()):
+    for pkg_name, pkg_info in hub_packages.items():
         # Get usage count
         usage_count = len([dep for dep in ecosystem.deps.values() if dep.pkg_name == pkg_name])
 
-        status_color = (Colors.GREEN if pkg_info.hub_status == 'current'
-                       else Colors.YELLOW if pkg_info.hub_status == 'outdated'
-                       else Colors.RED)
+        package_data = {
+            'name': pkg_name,
+            'hub_version': pkg_info.hub_version or "unknown",
+            'latest_version': pkg_info.latest_version,
+            'usage_count': usage_count,
+            'status': pkg_info.hub_status
+        }
 
-        hub_ver = pkg_info.hub_version or "unknown"
-        latest_ver = pkg_info.latest_version
+        if pkg_info.hub_status == 'current':
+            current_packages.append(package_data)
+        elif pkg_info.hub_status == 'outdated':
+            outdated_packages.append(package_data)
+        else:
+            gap_packages.append(package_data)
 
-        print(f"  {status_color}{pkg_info.hub_status.ljust(8)}{Colors.END} {Colors.BOLD}{pkg_name}{Colors.END}")
-        print(f"    Hub: {hub_ver} | Latest: {latest_ver} | Used in: {usage_count} deps")
+    # Current packages section
+    if current_packages:
+        print(f"\n{Colors.PURPLE}{Colors.BOLD}CURRENT PACKAGES:{Colors.END}")
+        print(f"{Colors.WHITE}Package              Hub Version     Latest          Usage     {Colors.END}")
+        print(f"{Colors.GRAY}------------------------------------------------------------{Colors.END}")
+
+        for pkg in sorted(current_packages, key=lambda x: x['name']):
+            pkg_name = f"{pkg['name']:<20}"
+            hub_ver = f"{pkg['hub_version']:<15}"
+            latest_ver = f"{Colors.CYAN}{pkg['latest_version']:<15}{Colors.END}"
+            usage = f"{Colors.WHITE}({pkg['usage_count']} projects){Colors.END}"
+
+            print(f"  {Colors.WHITE}{pkg_name} {hub_ver} {latest_ver} {usage}")
+
+    # Outdated packages section
+    if outdated_packages:
+        print(f"\n{Colors.PURPLE}{Colors.BOLD}OUTDATED PACKAGES:{Colors.END}")
+        print(f"{Colors.WHITE}Package              Hub Version     Latest          Usage     {Colors.END}")
+        print(f"{Colors.GRAY}------------------------------------------------------------{Colors.END}")
+
+        for pkg in sorted(outdated_packages, key=lambda x: -x['usage_count']):
+            pkg_name = f"{pkg['name']:<20}"
+            hub_ver = f"{Colors.YELLOW}{pkg['hub_version']:<15}{Colors.END}"
+            latest_ver = f"{Colors.CYAN}{pkg['latest_version']:<15}{Colors.END}"
+
+            # Color code usage based on project count
+            usage_color = Colors.GREEN if pkg['usage_count'] >= 8 else Colors.WHITE if pkg['usage_count'] >= 5 else Colors.GRAY
+            usage = f"{usage_color}({pkg['usage_count']} projects){Colors.END}"
+
+            print(f"  {Colors.WHITE}{pkg_name} {hub_ver} {latest_ver} {usage}")
+
+    # Find packages with high usage but not in hub (opportunities)
+    all_packages = {}
+    for dep in ecosystem.deps.values():
+        pkg_name = dep.pkg_name
+        if pkg_name not in all_packages:
+            all_packages[pkg_name] = 0
+        all_packages[pkg_name] += 1
+
+    opportunities = []
+    for pkg_name, usage_count in all_packages.items():
+        if usage_count >= 5 and pkg_name not in hub_packages:
+            opportunities.append((pkg_name, usage_count))
+
+    if opportunities:
+        print(f"\n{Colors.PURPLE}{Colors.BOLD}PACKAGE OPPORTUNITIES (5+ usage, not in hub):{Colors.END}")
+        print(f"{Colors.GRAY}{'-'*80}{Colors.END}")
+
+        # Show opportunities in legacy format
+        opp_text = "  "
+        for i, (pkg_name, count) in enumerate(sorted(opportunities, key=lambda x: -x[1])):
+            opp_text += f"{Colors.GREEN}{pkg_name}({count}){Colors.END}"
+            if i < len(opportunities) - 1 and i % 2 == 0:
+                opp_text += "                  "
+            elif i < len(opportunities) - 1:
+                opp_text += "\n  "
+        print(opp_text)
+
+    # Visual summary bar matching legacy
+    current_count = len(current_packages)
+    outdated_count = len(outdated_packages)
+    gap_count = len(gap_packages)
+    unused_count = 0  # Not tracking unused packages in fast view
+    unique_count = len(ecosystem.latest) - len(hub_packages)  # Packages not in hub
+
+    print(f"\n{Colors.PURPLE}{Colors.BOLD}HUB PACKAGES:{Colors.END}")
+    summary_line = (f"  Current     Outdated    Gap         Unused      Unique      \n"
+                   f"  {Colors.BLUE}■{Colors.END} {Colors.BLUE}{current_count}{Colors.END}         "
+                   f"{Colors.ORANGE}■{Colors.END} {Colors.ORANGE}{outdated_count}{Colors.END}        "
+                   f"{Colors.GREEN}■{Colors.END} {Colors.GREEN}{gap_count}{Colors.END}         "
+                   f"{Colors.RED}■{Colors.END} {Colors.RED}{unused_count}{Colors.END}         "
+                   f"{Colors.GRAY}■{Colors.END} {Colors.GRAY}{unique_count}{Colors.END}")
+    print(summary_line)
 
 def discover_repositories(force_live=False):
     """Discover repository paths using cache or live discovery
