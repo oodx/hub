@@ -3148,78 +3148,44 @@ def main():
         # For other commands, we need to analyze dependencies first
         dependencies = analyze_dependencies()
 
-        if args.command == 'export':
-            export_raw_data(dependencies)
-        elif args.command == 'eco':
-            detailed_review(dependencies)
-        elif args.command == 'review':
-            detailed_review(dependencies)
-        elif args.command == 'pkg':
-            if not args.package:
-                print(f"{Colors.RED}❌ Package name required for 'pkg' command{Colors.END}")
-                print(f"Usage: python deps.py pkg <package_name>")
-                sys.exit(1)
-            analyze_package(dependencies, args.package)
-        elif args.command == 'all':
-            # Show all version conflicts (old analyze behavior)
-            format_version_analysis(dependencies)
-        elif args.command == 'hub':
-            # Show hub package status
-            analyze_hub_status(dependencies)
-        elif args.command == 'data':
-            # Generate structured data cache
-            generate_data_cache(dependencies, args.fast_mode)
-        elif args.command == 'test':
-            # Test hydration function
-            try:
-                ecosystem = hydrate_tsv_cache()
-                print(f"{Colors.GREEN}✅ Hydration successful!{Colors.END}")
-                print(f"   Loaded {len(ecosystem.aggregation)} aggregation metrics")
-                print(f"   Loaded {len(ecosystem.repos)} repositories")
-                print(f"   Loaded {len(ecosystem.deps)} dependencies")
-                print(f"   Loaded {len(ecosystem.latest)} packages")
-                print(f"   Loaded {len(ecosystem.version_maps)} version mappings")
-                print(f"\n{format_aggregation_summary(ecosystem)}")
-            except Exception as e:
-                print(f"{Colors.RED}❌ Hydration failed: {e}{Colors.END}")
-        elif args.command == 'superclean':
-            # Clean all target directories in ecosystem
-            superclean_targets()
-        elif args.command == 'tap':
-            # Auto-commit uncommitted changes across repositories
-            tap_repositories(ssh_profile=args.ssh_profile)
-        elif args.command == 'ssh-test':
-            # Test SSH connection standalone
-            test_ssh_connection(ssh_profile=args.ssh_profile)
-        elif args.command == 'ls':
-            # List repositories
-            list_repositories(force_live=args.live)
-        elif args.command == 'fast':
-            # Fast hydrated view commands
+        # Fast view commands (primary interface)
+        if args.command in ['conflicts', 'query', 'review', 'hub', 'pkg']:
             try:
                 ecosystem = hydrate_tsv_cache()
                 print(f"✅ Hydration successful: {len(ecosystem.deps)} deps, {len(ecosystem.repos)} repos")
 
-                if args.conflicts:
+                if args.command == 'conflicts':
                     view_conflicts(ecosystem)
-                elif args.pkg_detail:
-                    view_package_detail(ecosystem, args.pkg_detail)
-                elif args.hub_dashboard:
-                    view_hub_dashboard(ecosystem)
-                elif args.review:
-                    view_review(ecosystem)
-                elif args.query:
+                elif args.command == 'query':
                     view_query(ecosystem)
-                else:
-                    # Default fast view - show conflicts
-                    view_conflicts(ecosystem)
+                elif args.command == 'review':
+                    view_review(ecosystem)
+                elif args.command == 'hub':
+                    view_hub_dashboard(ecosystem)
+                elif args.command == 'pkg':
+                    if args.package:
+                        view_package_detail(ecosystem, args.package)
+                    else:
+                        print(f"{Colors.RED}❌ Package name required for pkg command{Colors.END}")
+                        print(f"Usage: ./repos.py pkg <package-name>")
+                        return
             except Exception as e:
-                print(f"❌ Error in fast command: {e}")
+                print(f"❌ Error in {args.command} command: {e}")
                 import traceback
                 traceback.print_exc()
                 return
-        else:  # default 'analyze', 'query', 'q'
-            # Show package usage analysis
+
+        # Utility commands
+        elif args.command == 'data':
+            generate_data_cache(dependencies, args.fast_mode)
+        elif args.command == 'export':
+            export_raw_data(dependencies)
+        elif args.command == 'superclean':
+            superclean_targets()
+        elif args.command == 'ls':
+            list_repositories(force_live=args.live)
+        elif args.command == 'legacy':
+            # Legacy analyze command for backwards compatibility
             analyze_package_usage(dependencies)
 
     except KeyboardInterrupt:
