@@ -2397,6 +2397,242 @@ def view_hub_dashboard(ecosystem: EcosystemData) -> None:
                    f"{Colors.GRAY}■{Colors.END} {Colors.GRAY}{unique_count}{Colors.END}")
     print(summary_line)
 
+def view_review(ecosystem: EcosystemData) -> None:
+    """Lightning-fast ecosystem dependency review using hydrated data
+
+    Replaces review command with instant analysis
+    """
+    print(f"{Colors.WHITE}{Colors.BOLD}📋 ECOSYSTEM DEPENDENCY REVIEW{Colors.END}")
+    print(f"{Colors.GRAY}Status of each dependency across all Rust projects (ignoring hub){Colors.END}")
+    print(f"{Colors.GRAY}{'='*80}{Colors.END}")
+
+    print(f"\n{Colors.GRAY}Loading latest versions from deps_data.txt cache (run 'export' to refresh)...{Colors.END}")
+
+    # Table header
+    print(f"\n{Colors.WHITE}{Colors.BOLD}Package              #U   Ecosystem      Latest               Breaking{Colors.END}")
+    print(f"{Colors.GRAY}{'-'*105}{Colors.END}")
+
+    # Collect all packages with usage stats
+    package_stats = {}
+    for dep in ecosystem.deps.values():
+        pkg_name = dep.pkg_name
+        if pkg_name not in package_stats:
+            package_stats[pkg_name] = {
+                'versions': set(),
+                'usage_count': 0,
+                'repos': set()
+            }
+        package_stats[pkg_name]['versions'].add(dep.pkg_version)
+        package_stats[pkg_name]['usage_count'] += 1
+        package_stats[pkg_name]['repos'].add(dep.repo_id)
+
+    # Sort by usage count descending
+    sorted_packages = sorted(package_stats.items(), key=lambda x: -x[1]['usage_count'])
+
+    for pkg_name, stats in sorted_packages:
+        # Get latest version info
+        latest_info = ecosystem.latest.get(pkg_name)
+        latest_version = latest_info.latest_version if latest_info else "unknown"
+
+        # Determine ecosystem version (most common or highest)
+        versions_list = list(stats['versions'])
+        if len(versions_list) == 1:
+            eco_version = versions_list[0]
+        else:
+            # For conflicts, show the highest version as ecosystem version
+            eco_version = sorted(versions_list)[-1]
+
+        # Determine status icon and colors
+        has_conflicts = len(stats['versions']) > 1
+        is_outdated = eco_version != latest_version
+
+        # Determine breaking change status
+        breaking_status = Colors.GREEN + "safe" + Colors.END
+        if latest_info and eco_version != latest_version:
+            # Check if major version changed (simplified logic)
+            try:
+                eco_major = eco_version.split('.')[0] if '.' in eco_version else eco_version
+                latest_major = latest_version.split('.')[0] if '.' in latest_version else latest_version
+                if eco_major != latest_major and eco_major.isdigit() and latest_major.isdigit():
+                    if int(latest_major) > int(eco_major):
+                        breaking_status = Colors.RED + "BREAKING" + Colors.END
+                    else:
+                        breaking_status = Colors.ORANGE + "BREAKING" + Colors.END
+            except:
+                pass
+
+        if eco_version == latest_version:
+            breaking_status = Colors.GRAY + "current" + Colors.END
+
+        # Status icon
+        if has_conflicts:
+            icon = Colors.RED + "■" + Colors.END
+            eco_color = Colors.RED
+        elif is_outdated:
+            icon = Colors.ORANGE + "■" + Colors.END
+            eco_color = Colors.ORANGE
+        else:
+            icon = Colors.GRAY + "■" + Colors.END
+            eco_color = Colors.GRAY
+
+        # Special cases for 0.x versions
+        if eco_version.startswith("0."):
+            icon = Colors.YELLOW + "◐" + Colors.END
+
+        # Format package name
+        pkg_display = f"{Colors.GRAY}{pkg_name:<20}{Colors.END}"
+
+        # Format usage count
+        usage_display = f"{stats['usage_count']:<4}"
+
+        # Format versions with color when different
+        if eco_version != latest_version:
+            eco_display = f"{eco_color}{eco_version:<15}{Colors.END}"
+            latest_display = f"{Colors.CYAN}{latest_version:<20}{Colors.END}"
+        else:
+            eco_display = f"{Colors.GRAY}{eco_version:<15}{Colors.END}"
+            latest_display = f"{Colors.GRAY}{latest_version:<20}{Colors.END}"
+
+        print(f"{pkg_display} {usage_display} {icon} {eco_display} {latest_display} {breaking_status}")
+
+    # Legend
+    print(f"\n{Colors.PURPLE}{Colors.BOLD}Legend:{Colors.END}")
+    print(f"{Colors.GRAY}■{Colors.END} UPDATED   - Using latest version, no conflicts")
+    print(f"{Colors.ORANGE}■{Colors.END} OUTDATED  - Newer version available (safe update)")
+    print(f"{Colors.ORANGE}⚠{Colors.END} BREAKING  - Breaking change update available")
+    print(f"{Colors.RED}■{Colors.END} CONFLICT  - Multiple versions in ecosystem")
+    print(f"{Colors.RED}⚠{Colors.END} CRITICAL  - Breaking change conflicts")
+    print(f"{Colors.YELLOW}◐{Colors.END} UNSTABLE  - 0.x version (minor bumps can break)")
+    print(f"{Colors.YELLOW}◑{Colors.END} PREREL    - Pre-release version")
+    print()
+    print(f"Breaking: {Colors.RED}BREAKING{Colors.END} (conflicts), {Colors.ORANGE}BREAKING{Colors.END} (updates), {Colors.GREEN}safe{Colors.END}, {Colors.GRAY}current{Colors.END}")
+    print(f"Versions: Only colored when {Colors.ORANGE}ecosystem{Colors.END} ≠ {Colors.CYAN}latest{Colors.END}")
+
+def view_query(ecosystem: EcosystemData) -> None:
+    """Lightning-fast package usage analysis using hydrated data
+
+    Replaces query command with instant analysis
+    """
+    print(f"{Colors.PURPLE}{Colors.BOLD}📊 PACKAGE USAGE ANALYSIS{Colors.END}")
+    print(f"{Colors.PURPLE}{'='*80}{Colors.END}")
+
+    # Collect usage stats
+    package_usage = {}
+    for dep in ecosystem.deps.values():
+        pkg_name = dep.pkg_name
+        if pkg_name not in package_usage:
+            package_usage[pkg_name] = set()
+        package_usage[pkg_name].add(dep.repo_id)
+
+    # Categorize packages
+    high_usage = []
+    medium_usage = []
+    low_usage = []
+
+    for pkg_name, repo_ids in package_usage.items():
+        count = len(repo_ids)
+        latest_info = ecosystem.latest.get(pkg_name)
+        in_hub = latest_info and latest_info.hub_status != 'NONE'
+
+        entry = (pkg_name, count, in_hub)
+        if count >= 5:
+            high_usage.append(entry)
+        elif count >= 3:
+            medium_usage.append(entry)
+        else:
+            low_usage.append(entry)
+
+    # Sort each category by usage count
+    high_usage.sort(key=lambda x: -x[1])
+    medium_usage.sort(key=lambda x: -x[1])
+    low_usage.sort(key=lambda x: -x[1])
+
+    # Summary
+    print(f"\n{Colors.PURPLE}{Colors.BOLD}SUMMARY:{Colors.END}")
+    print(f"  {'High':<12}{'Med':<12}{'Low':<12}{'Total':<12}")
+    print(f"  {Colors.WHITE}{len(high_usage):<12}{len(medium_usage):<12}{Colors.GRAY}{len(low_usage):<12}{Colors.END}{Colors.BOLD}{len(package_usage):<12}{Colors.END}")
+
+    # High usage packages
+    if high_usage:
+        print(f"\n{Colors.PURPLE}{Colors.BOLD}HIGH USAGE (5+ projects):{Colors.END}")
+        print(f"{Colors.GRAY}{'-'*80}{Colors.END}")
+        line = "  "
+        for i, (pkg_name, count, in_hub) in enumerate(high_usage):
+            color = Colors.BLUE if in_hub else Colors.GREEN
+            suffix = "*" if in_hub else ""
+            line += f"{color}{pkg_name}({count}){suffix}{Colors.END}"
+
+            # Add spacing or newline
+            if (i + 1) % 3 == 0 and i < len(high_usage) - 1:
+                print(line)
+                line = "  "
+            elif i < len(high_usage) - 1:
+                # Calculate spacing to align columns
+                padding = 26 - len(f"{pkg_name}({count}){suffix}")
+                line += " " * max(1, padding)
+        if line.strip():
+            print(line)
+
+    # Medium usage packages
+    if medium_usage:
+        print(f"\n{Colors.PURPLE}{Colors.BOLD}MEDIUM USAGE (3-4 projects):{Colors.END}")
+        print(f"{Colors.GRAY}{'-'*80}{Colors.END}")
+        line = "  "
+        for i, (pkg_name, count, in_hub) in enumerate(medium_usage):
+            color = Colors.BLUE if in_hub else Colors.WHITE
+            suffix = "*" if in_hub else ""
+            line += f"{color}{pkg_name}({count}){suffix}{Colors.END}"
+
+            # Add spacing or newline
+            if (i + 1) % 3 == 0 and i < len(medium_usage) - 1:
+                print(line)
+                line = "  "
+            elif i < len(medium_usage) - 1:
+                # Calculate spacing to align columns
+                padding = 26 - len(f"{pkg_name}({count}){suffix}")
+                line += " " * max(1, padding)
+        if line.strip():
+            print(line)
+
+    # Low usage packages
+    if low_usage:
+        print(f"\n{Colors.PURPLE}{Colors.BOLD}LOW USAGE (1-2 projects):{Colors.END}")
+        print(f"{Colors.GRAY}{'-'*80}{Colors.END}")
+        line = "  "
+        for i, (pkg_name, count, in_hub) in enumerate(low_usage):
+            color = Colors.BLUE if in_hub else Colors.GRAY
+            suffix = "*" if in_hub else ""
+            line += f"{color}{pkg_name}({count}){suffix}{Colors.END}"
+
+            # Add spacing or newline
+            if (i + 1) % 3 == 0 and i < len(low_usage) - 1:
+                print(line)
+                line = "  "
+            elif i < len(low_usage) - 1:
+                # Calculate spacing to align columns
+                padding = 26 - len(f"{pkg_name}({count}){suffix}")
+                line += " " * max(1, padding)
+        if line.strip():
+            print(line)
+
+    # Hub status summary (same as before)
+    hub_packages = {name: info for name, info in ecosystem.latest.items()
+                   if info.hub_status != 'NONE'}
+
+    current_count = sum(1 for info in hub_packages.values() if info.hub_status == 'current')
+    outdated_count = sum(1 for info in hub_packages.values() if info.hub_status == 'outdated')
+    gap_count = len([pkg for pkg, count, _ in high_usage if not ecosystem.latest.get(pkg) or ecosystem.latest.get(pkg).hub_status == 'NONE'])
+    unused_count = 0
+    unique_count = len(ecosystem.latest) - len(hub_packages)
+
+    print(f"\n{Colors.PURPLE}{Colors.BOLD}HUB STATUS:{Colors.END}")
+    print(f"  Current     Outdated    Gap         Unused      Unique      ")
+    print(f"  {Colors.BLUE}■{Colors.END} {Colors.BLUE}{current_count}{Colors.END}         "
+          f"{Colors.ORANGE}■{Colors.END} {Colors.ORANGE}{outdated_count}{Colors.END}        "
+          f"{Colors.GREEN}■{Colors.END} {Colors.GREEN}{gap_count}{Colors.END}         "
+          f"{Colors.RED}■{Colors.END} {Colors.RED}{unused_count}{Colors.END}         "
+          f"{Colors.GRAY}■{Colors.END} {Colors.GRAY}{unique_count}{Colors.END}")
+
 def discover_repositories(force_live=False):
     """Discover repository paths using cache or live discovery
 
@@ -2690,6 +2926,8 @@ def main():
     parser.add_argument('--conflicts', action='store_true', help='Show version conflicts (fast command)')
     parser.add_argument('--pkg-detail', default=None, help='Show package details (fast command)')
     parser.add_argument('--hub-dashboard', action='store_true', help='Show hub dashboard (fast command)')
+    parser.add_argument('--review', action='store_true', help='Show ecosystem dependency review (fast command)')
+    parser.add_argument('--query', action='store_true', help='Show package usage analysis (fast command)')
 
     args = parser.parse_args()
 
@@ -2763,6 +3001,10 @@ def main():
                     view_package_detail(ecosystem, args.pkg_detail)
                 elif args.hub_dashboard:
                     view_hub_dashboard(ecosystem)
+                elif args.review:
+                    view_review(ecosystem)
+                elif args.query:
+                    view_query(ecosystem)
                 else:
                     # Default fast view - show conflicts
                     view_conflicts(ecosystem)
