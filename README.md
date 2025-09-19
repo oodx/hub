@@ -26,9 +26,9 @@ use hub::prelude::*;
 
 Hub provides powerful commands for ecosystem-wide analysis and management:
 
-### 🚀 View Commands (Default 100x+ Performance)
+### 🚀 View Commands (Default Performance)
 ```bash
-# All view commands now use TSV cache for instant 100x+ performance
+# All view commands use the fastest TSV cache
 
 # Display quick ecosystem statistics
 ./bin/repos.py stats
@@ -45,7 +45,7 @@ Hub provides powerful commands for ecosystem-wide analysis and management:
 # Show dependency graph for a package
 ./bin/repos.py graph <package>
 
-# Existing view commands (now using default fast mode)
+# Other view commands
 ./bin/repos.py conflicts
 ./bin/repos.py query
 ./bin/repos.py review
@@ -331,23 +331,23 @@ cargo test --features "all"
 # 1. Generate fresh cache for fast views (100x+ performance)
 ./bin/repos.py data
 
-# 2. Quick ecosystem health check (instant)
-./bin/repos.py --conflicts
+# 2. Quick ecosystem health check
+./bin/repos.py conflicts
 
-# 3. Package usage analysis (instant)
-./bin/repos.py --query
+# 3. Package usage analysis
+./bin/repos.py query
 
-# 4. Full dependency review (instant)
-./bin/repos.py --review
+# 4. Full dependency review
+./bin/repos.py review
 
-# 5. Hub integration status (instant)
-./bin/repos.py --hub-dashboard
+# 5. Hub integration status
+./bin/repos.py hub
 
 # 6. Clean build artifacts across all repositories
 ./bin/repos.py superclean
 
-# 7. Check specific packages (instant)
-./bin/repos.py --pkg-detail serde
+# 7. Check specific packages
+./bin/repos.py pkg serde
 
 # 8. Traditional analysis (when needed)
 ./bin/repos.py all                # Comprehensive analysis
@@ -428,16 +428,16 @@ Hub has evolved from a simple dependency analyzer to a comprehensive repository 
 # Clone or navigate to hub project
 cd /path/to/rust/oodx/projects/hub
 
-# Generate initial data cache for 100x+ performance
+# Generate initial data cache
 ./bin/repos.py data
 
-# Fast ecosystem analysis (instant results)
-./bin/repos.py --conflicts      # Version conflict analysis
-./bin/repos.py --query          # Package usage analysis
-./bin/repos.py --review         # Full dependency review
+# Ecosystem commands
+./bin/repos.py conflicts      # Version conflict analysis
+./bin/repos.py query          # Package usage analysis
+./bin/repos.py review         # Dependency review
 
-# Traditional analysis (when needed)
-./bin/repos.py review
+# Full ecosystem analysis
+./bin/repos.py all
 ```
 
 ### Environment Setup
