@@ -2332,9 +2332,9 @@ def view_hub_dashboard(ecosystem: EcosystemData) -> None:
     print(f"{Colors.PURPLE}{Colors.BOLD}🎯 HUB PACKAGE STATUS{Colors.END}")
     print(f"{Colors.PURPLE}{'='*80}{Colors.END}")
 
-    # Get hub packages (packages with hub status)
+    # Get hub packages (packages actually IN hub - current or outdated status)
     hub_packages = {name: info for name, info in ecosystem.latest.items()
-                   if info.hub_status != 'NONE'}
+                   if info.hub_status in ['current', 'outdated']}
 
     if not hub_packages:
         print(f"{Colors.YELLOW}⚠️  No hub packages found in ecosystem{Colors.END}")
@@ -2451,6 +2451,17 @@ def view_hub_dashboard(ecosystem: EcosystemData) -> None:
             elif i < len(opportunities) - 1:
                 opp_text += "\n  "
         print(opp_text)
+
+    # Build package usage map for ecosystem
+    package_usage = {}
+    for dep in ecosystem.deps.values():
+        if dep.pkg_version not in ['path', 'workspace'] and dep.repo_id != 103:  # Exclude hub repo
+            if dep.pkg_name not in package_usage:
+                package_usage[dep.pkg_name] = set()
+            package_usage[dep.pkg_name].add(dep.repo_id)
+
+    # Convert to counts
+    package_usage = {pkg: len(repos) for pkg, repos in package_usage.items()}
 
     # Visual summary bar matching legacy
     current_count = len(current_packages)
