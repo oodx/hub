@@ -18,7 +18,7 @@ Continued development with dependency analysis tooling and encountered shell env
 
 #### 🔍 **Dependency Analysis Tools Created**
 - **analyze_deps.sh** - Initial bash script for basic dependency scanning
-- **bin/deps.py** - Enhanced Python script with multiple commands and color-coded output
+- **bin/repos.py** - Enhanced Python script with multiple commands and color-coded output
 - **Version conflict detection** - Red for lowest versions, green for highest, organized by dependency
 - **Project coverage** - Scans all Cargo.toml files across 40+ rust projects in ecosystem
 
@@ -34,7 +34,7 @@ From initial analysis, we identified major ecosystem fragmentation:
 ```
 hub/
 ├── analyze_deps.sh     # Basic bash version (working)
-├── bin/deps.py         # Enhanced Python version with multiple commands
+├── bin/repos.py         # Enhanced Python version with multiple commands
 ├── src/lib.rs          # Feature-gated re-exports
 ├── Cargo.toml          # THE canonical dependency list
 ├── STRATEGY.md         # Design principles
@@ -93,7 +93,7 @@ Completed the major refactor to structured data cache with proper hub integratio
 
 #### 🎨 **Visual Design Revolution**
 - **Smart coloring system** - Only highlights what matters (problems and opportunities)
-- **Executable script** - Direct execution with `./bin/deps.py` (no python prefix needed)
+- **Executable script** - Direct execution with `./bin/repos.py` (no python prefix needed)
 - **Status block icons** - Colored squares (🔴🟠🔘) for immediate visual status
 - **Ecosystem vs Latest comparison** - Cyan highlighting only for version differences
 - **Gray-by-default** - Clean, non-distracting rows with selective emphasis
@@ -118,7 +118,7 @@ Completed the major refactor to structured data cache with proper hub integratio
 - **Color consistency** - Hub legend colors match across all commands
 
 #### 📊 **Analysis Script Features**
-The enhanced Python script (`bin/deps.py`) provides:
+The enhanced Python script (`bin/repos.py`) provides:
 - **TOML parsing**: Robust Cargo.toml dependency extraction
 - **Color coding**: Red (lowest version), Green (highest version), Yellow (middle versions)
 - **Conflict detection**: Clear indication of version conflicts with ⚠️/✅ indicators
@@ -195,7 +195,7 @@ hub/
 - [x] **General repo helper architecture** - Reusable functions for consistent dependency analysis
 
 ### 🚀 **Ready for Integration**
-- [x] **Python dependency analysis** - Enhanced bin/deps.py with multiple commands
+- [x] **Python dependency analysis** - Enhanced bin/repos.py with multiple commands
 - [x] **Production-ready analysis tooling** - Complete ecosystem dependency analysis with smart visual design
 - [x] **Structured data cache foundation** - Fast analysis views with hub integration tracking
 - [ ] **Meteor integration** - First consumer project (immediate need)
@@ -353,7 +353,7 @@ use hub::data::serde_json;
 ## How to Continue
 
 ### 🎯 **Immediate Actions**
-1. **Run dependency analysis** - Execute `python bin/deps.py` with enhanced commands
+1. **Run dependency analysis** - Execute `python bin/repos.py` with enhanced commands
 2. **Review conflict report** - Analyze version conflicts and prioritize resolution order
 3. **Integrate with meteor** - Update meteor to use hub dependencies
 4. **Test compatibility** - Verify meteor builds and functions correctly
@@ -376,7 +376,7 @@ powa               # Should execute user's powa alias
 load_pyenv         # Should work if available
 
 # Test package installation
-pip install toml packaging    # Required for bin/deps.py
+pip install toml packaging    # Required for bin/repos.py
 ```
 
 ### 📚 **Essential Reading**
@@ -384,7 +384,7 @@ pip install toml packaging    # Required for bin/deps.py
 - `README.md` - Usage patterns and integration guide
 - `Cargo.toml` - Feature structure and available dependencies
 - `src/lib.rs` - Implementation patterns and module organization
-- `bin/deps.py` - Enhanced dependency analysis tool with multiple commands
+- `bin/repos.py` - Enhanced dependency analysis tool with multiple commands
 - `analyze_deps.sh` - Basic dependency analysis tool (working)
 
 ### 🔧 **Enhanced Analysis Tools Usage**
@@ -392,16 +392,16 @@ pip install toml packaging    # Required for bin/deps.py
 # From hub directory (/home/xnull/repos/code/rust/oodx/projects/hub/)
 
 # EXECUTABLE SCRIPT - No python prefix needed!
-./bin/deps.py [command]               # Direct execution with enhanced commands
+./bin/repos.py [command]               # Direct execution with enhanced commands
 
 # COMMAND OVERVIEW:
-./bin/deps.py analyze                 # Default usage analysis (HIGH/MED/LOW priority)
-./bin/deps.py eco                     # Ecosystem dependency review (smart visual design)
-./bin/deps.py hub                     # Hub integration status and opportunities
-./bin/deps.py pkg regex               # Analyze specific package usage patterns
-./bin/deps.py latest serde            # Check latest version on crates.io
-./bin/deps.py data                    # Generate structured data cache (TSV sections)
-./bin/deps.py export                  # Export with progress spinner to deps_data.txt
+./bin/repos.py analyze                 # Default usage analysis (HIGH/MED/LOW priority)
+./bin/repos.py eco                     # Ecosystem dependency review (smart visual design)
+./bin/repos.py hub                     # Hub integration status and opportunities
+./bin/repos.py pkg regex               # Analyze specific package usage patterns
+./bin/repos.py latest serde            # Check latest version on crates.io
+./bin/repos.py data                    # Generate structured data cache (TSV sections)
+./bin/repos.py export                  # Export with progress spinner to deps_data.txt
 
 # SMART VISUAL DESIGN (eco command):
 # - Gray rows by default (clean, non-distracting)

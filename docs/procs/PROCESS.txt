@@ -1,0 +1,216 @@
+================================================================================
+ 🚀 HUB PROJECT WORKFLOW PROCESS
+================================================================================
+
+# PROJECT STRUCTURE & KEY DOCUMENTS
+
+## Core Entry Points
+- START.txt - Single entry point (this document's parent)
+- .session/CONTINUE.md - Master session state & handoff management
+- TASKS.txt - Implementation tracking with completion status
+- docs/procs/QUICK_REF.txt - 30-second ultra-fast context
+
+## Technical Documentation (docs/)
+- docs/HUB_STRAT.md - Core centralized dependency management strategy
+- docs/REFACTOR_STRAT.md - Data cache implementation (COMPLETE)
+- docs/VERSION_STRAT.md - Semantic versioning strategy
+- docs/BOXY_INTEGRATION.md - UI/UX enhancement integration
+- docs/UAT_COMMANDS.md - User acceptance testing procedures
+
+## Analysis & Knowledge (.eggs/)
+- .eggs/ - Comprehensive analysis wisdom capture system
+- China agent analysis eggs with detailed technical insights
+- Performance metrics and optimization strategies
+
+## Testing & Quality (.uat/)
+- .uat/v0.1.0/ - HORUS LEVEL2 certified testing framework
+- UAT certification documentation and regression tracking
+
+# SELF-HYDRATING WORKFLOW PROCESS
+
+## Step 1: Context Hydration Checklist
+1. Read START.txt for immediate orientation (30 seconds)
+2. Read .session/CONTINUE.md for complete project state (3 minutes)
+3. Review TASKS.txt for current implementation status (1 minute)
+4. Check docs/procs/QUICK_REF.txt for critical context updates
+5. Run ./bin/repos.py analyze for current ecosystem state
+
+## Step 2: Phase Detection
+**Current Phase**: Ready for Ecosystem Integration
+- ✅ Architecture & Strategy Complete (Sessions 1-4)
+- ✅ Production Tools Developed (100x+ performance achieved)
+- ✅ Data Cache System Implemented (REFACTOR_STRAT.md: COMPLETE)
+- ✅ UAT Framework Certified (HORUS LEVEL2)
+- 🎯 **Next**: Meteor integration as first consumer project
+
+## Step 3: Work Execution Patterns
+
+### Development Session Pattern:
+1. **Context Load**: Read .session/CONTINUE.md current status
+2. **Tool Analysis**: Run ./bin/repos.py [analyze|eco|hub] as needed
+3. **Implementation**: Work on current phase tasks from TASKS.txt
+4. **Validation**: Use .uat/ testing framework for quality assurance
+5. **Documentation**: Update session state in .session/CONTINUE.md
+
+### Integration Session Pattern:
+1. **Dependency Analysis**: ./bin/repos.py hub for integration opportunities
+2. **Consumer Project Setup**: Update target project Cargo.toml
+3. **Import Migration**: Replace direct deps with hub feature imports
+4. **Testing**: Validate functionality preservation
+5. **Documentation**: Record integration patterns and lessons
+
+### Ecosystem Migration Pattern:
+1. **Gap Analysis**: ./bin/repos.py eco for ecosystem overview
+2. **Priority Planning**: Focus on high-usage dependencies first
+3. **Coordinated Updates**: Systematic project-by-project migration
+4. **Version Validation**: Ensure no conflicts across ecosystem
+5. **Performance Verification**: Confirm build time improvements
+
+## Step 4: Session Closure & Handoff Requirements
+
+### Mandatory Updates to .session/CONTINUE.md:
+- **What was accomplished** - Specific deliverables with file references
+- **Current status** - Project phase and next immediate priorities
+- **Blockers identified** - Dependencies or issues requiring resolution
+- **Next agent actions** - Critical first steps for continuation
+- **Context preservation** - Key decisions and architectural insights
+
+### Quality Checkpoints:
+- Run ./bin/validate-docs.sh for documentation integrity
+- Update TASKS.txt completion status
+- Commit changes with descriptive messages
+- Ensure .eggs/ captures any new analysis insights
+
+# PROJECT STATUS QUICK REFERENCE
+
+## Current Priorities
+1. **Meteor Integration** - First consumer project implementation
+2. **RSB Migration** - Replace RSB's deps.rs with hub imports
+3. **Ecosystem Rollout** - Migrate remaining oodx projects
+4. **Performance Validation** - Confirm build time improvements
+
+## Progress Tracking Metrics
+- ✅ **Strategy Phase**: Complete (598-line HUB_STRAT.md)
+- ✅ **Tool Development**: Complete (100x+ performance achieved)
+- ✅ **Data Architecture**: Complete (4-section TSV cache system)
+- ✅ **Quality Framework**: Complete (HORUS LEVEL2 certification)
+- 🎯 **Integration Phase**: Active (Meteor → RSB → Ecosystem)
+
+## Key Decision Context
+- **Centralized Dependencies**: Single source of truth eliminates conflicts
+- **Feature-Gated Access**: Projects only get explicitly requested features
+- **Hub-Aware Analysis**: Separate hub tracking prevents self-counting
+- **Breaking Change Detection**: Rust SemVer compliance with 0.x handling
+
+# COMMON WORKFLOWS
+
+## Dependency Analysis Workflow
+```bash
+cd /home/xnull/repos/code/rust/oodx/projects/hub/
+
+# Production dependency analysis tool (executable script)
+./bin/repos.py analyze     # Usage analysis (HIGH/MED/LOW priority)
+./bin/repos.py eco         # Ecosystem review with smart visual design
+./bin/repos.py hub         # Hub integration status & opportunities
+./bin/repos.py pkg serde   # Package-specific analysis across ecosystem
+./bin/repos.py latest      # Check latest versions from crates.io
+./bin/repos.py data        # Generate structured TSV cache
+```
+
+## Integration Implementation Workflow
+```bash
+# 1. Consumer project Cargo.toml update
+[dependencies]
+hub = { path = "../../hub", features = ["regex", "serde"] }
+
+# 2. Import migration pattern
+# From: use regex::Regex;
+# To:   use hub::regex::Regex;
+
+# 3. Validation testing
+cargo check && cargo test
+```
+
+## Session Management Workflow
+```bash
+# Session start
+cat START.txt                    # Quick orientation
+cat .session/CONTINUE.md         # Full context load
+cat docs/procs/QUICK_REF.txt     # Critical updates
+
+# During work
+./bin/repos.py [command]         # Analysis as needed
+git status && git diff           # Track changes
+
+# Session end
+vim .session/CONTINUE.md         # Update handoff state
+./bin/validate-docs.sh           # Verify documentation
+git add . && git commit -m "..."  # Preserve work
+```
+
+# AGENT QUICK START GUIDE
+
+## Essential Project Context
+**What**: Centralized dependency management for oodx/RSB ecosystem
+**Why**: Eliminate version conflicts, dependency bloat, and upgrade hell
+**How**: Feature-gated hub with domain-organized dependencies
+**Status**: Ready for ecosystem integration (architecture complete)
+
+## Key Architecture Insights
+- **Single Source of Truth**: All external deps declared once in hub
+- **Feature Gates**: Projects only access explicitly requested dependencies
+- **Domain Organization**: text, data, time, web, system, dev, random
+- **TSV Cache System**: 4-section relational structure for fast analysis
+- **Hub Integration Tracking**: Separate analysis prevents self-counting
+
+## Workflow Rules & Conventions
+- **Session State**: Always update .session/CONTINUE.md with handoff info
+- **Documentation**: Keep START.txt and QUICK_REF.txt current
+- **Analysis**: Use ./bin/repos.py for all dependency investigation
+- **Quality**: HORUS LEVEL2 standards for UAT certification
+- **Validation**: Run ./bin/validate-docs.sh before major changes
+
+## Common Integration Patterns
+```rust
+// Feature-based imports
+use hub::regex::Regex;
+use hub::serde::{Serialize, Deserialize};
+
+// Domain-specific imports
+use hub::text::regex;
+use hub::data::serde_json;
+
+// Convenience group imports
+// Cargo.toml: features = ["common"]  // text + data
+// Cargo.toml: features = ["core"]    // text + data + time
+```
+
+# REFERENCE LINKS
+
+## Essential Files (Priority Order)
+1. .session/CONTINUE.md - Complete project state & session history
+2. TASKS.txt - Implementation tracking with completion status
+3. docs/HUB_STRAT.md - Core architecture strategy (598 lines)
+4. docs/REFACTOR_STRAT.md - Data cache implementation (COMPLETE)
+5. START.txt - Single entry point with quick orientation
+
+## Topic-Specific References (docs/)
+- docs/VERSION_STRAT.md - Semantic versioning & tool integration
+- docs/BOXY_INTEGRATION.md - UI/UX enhancement patterns
+- docs/UAT_COMMANDS.md - Testing & validation procedures
+- docs/lics/ - Complete licensing structure
+
+## Analysis & Knowledge (.eggs/)
+- .eggs/ directory - Comprehensive technical analysis archive
+- China agent eggs with performance metrics and insights
+- Strategic analysis and optimization recommendations
+
+## Testing & Validation
+- .uat/v0.1.0/ - HORUS LEVEL2 certified testing framework
+- ./bin/validate-docs.sh - Documentation integrity validation
+- ./bin/repos.py - Production dependency analysis (100x+ performance)
+
+================================================================================
+Last Updated: 2025-09-20 (Meta Process v2 Implementation)
+Next Review: After Meteor integration completion
+================================================================================
