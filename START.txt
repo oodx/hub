@@ -12,7 +12,7 @@ by providing a single source of truth for external dependencies.
 
 🎯 **Quick Start** (5 minutes to productive work):
 1. Read .session/CONTINUE.md ← Master project state & session history (3 min)
-2. Read TASKS.txt ← Current implementation status (1 min)
+2. Read docs/procs/TASKS.txt ← Current implementation status (1 min)
 3. Run ./bin/repos.py analyze ← Ecosystem dependency analysis (1 min)
 4. Begin work with full context
 
@@ -24,7 +24,8 @@ by providing a single source of truth for external dependencies.
 
 📁 **Key Process Documents**:
 - .session/CONTINUE.md - Session state & handoff management
-- TASKS.txt - Implementation tracking
+- docs/procs/TASKS.txt - Implementation tracking
+- docs/procs/META_PROCESS.txt - Meta-framework for workflow systems
 - docs/HUB_STRAT.md - Core architecture strategy
 - docs/REFACTOR_STRAT.md - Data cache implementation (COMPLETE)
 - docs/VERSION_STRAT.md - Semantic versioning strategy

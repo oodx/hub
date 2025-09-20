@@ -120,8 +120,8 @@ echo "Checking core file structure..."
 
 check_file "START.txt" "single entry point"
 check_file ".session/CONTINUE.md" "session state management"
-check_file "TASKS.txt" "implementation tracking"
-check_file "META_PROCESS.txt" "meta-process framework"
+check_file "docs/procs/TASKS.txt" "implementation tracking"
+check_file "docs/procs/META_PROCESS.txt" "meta-process framework"
 
 # Process documentation structure
 echo "Checking process documentation..."
@@ -161,7 +161,7 @@ echo "Checking document freshness..."
 
 check_staleness ".session/CONTINUE.md" 7 "Session state"
 check_staleness "docs/procs/QUICK_REF.txt" 7 "Quick reference"
-check_staleness "TASKS.txt" 14 "Task tracking"
+check_staleness "docs/procs/TASKS.txt" 14 "Task tracking"
 check_staleness "docs/HUB_STRAT.md" 30 "Hub strategy"
 
 # Reference integrity checks
