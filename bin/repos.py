@@ -2,11 +2,11 @@
 """
 Rust dependency analyzer - Enhanced with commands for export, review, and package analysis
 Commands:
-  python deps.py                    # Default analysis view
-  python deps.py export             # Export raw data to deps_data.txt
-  python deps.py review             # Detailed review with latest versions
-  python deps.py pkg <package>      # Analyze specific package usage
-  python deps.py latest <package>   # Check latest version from crates.io
+  python repos.py                   # Default analysis view
+  python repos.py export            # Export raw data to XDG data directory
+  python repos.py review            # Detailed review with latest versions
+  python repos.py pkg <package>     # Analyze specific package usage
+  python repos.py latest <package>  # Check latest version from crates.io
 """
 
 import os
@@ -44,6 +44,24 @@ from dataclasses import dataclass
 from typing import List, Dict, Set, Optional, Tuple
 import shutil
 import tempfile
+
+# XDG Base Directory support
+def get_xdg_data_home():
+    """Get XDG data directory, preferring XDG_DB_HOME, falling back to XDG_DATA_HOME, defaulting to ~/.local/data"""
+    return os.environ.get('XDG_DB_HOME',
+                         os.environ.get('XDG_DATA_HOME',
+                                       os.path.expanduser('~/.local/data')))
+
+def get_hub_data_dir():
+    """Get the hub data directory following XDG Base Directory specification"""
+    data_home = get_xdg_data_home()
+    hub_dir = os.path.join(data_home, 'oodx', 'hub')
+    os.makedirs(hub_dir, exist_ok=True)
+    return hub_dir
+
+def get_data_file_path(filename):
+    """Get full path for a data file in the hub data directory"""
+    return os.path.join(get_hub_data_dir(), filename)
 
 # Boxy integration helper
 USE_BOXY = os.environ.get('REPOS_USE_BOXY', '0') == '0'  # Shell convention: 0=true (default enabled), 1=false
@@ -529,9 +547,9 @@ def format_version_analysis(dependencies):
 
     # Load latest versions from data file if it exists
     latest_cache = {}
-    data_file = Path("deps_data.txt")
+    data_file = Path(get_data_file_path("deps_data.txt"))
     if data_file.exists():
-        print(f"{Colors.GRAY}Loading latest versions from deps_data.txt cache...{Colors.END}\n")
+        print(f"{Colors.GRAY}Loading latest versions from data cache...{Colors.END}\n")
         with open(data_file, 'r') as f:
             for line in f:
                 if line.startswith("DEPENDENCY:"):
@@ -664,7 +682,7 @@ def format_version_analysis(dependencies):
 
 def export_raw_data(dependencies):
     """Export raw dependency data to text file"""
-    output_file = "deps_data.txt"
+    output_file = get_data_file_path("deps_data.txt")
 
     # Filter dependencies with actual versions
     filtered_deps = {}
@@ -727,9 +745,9 @@ def detailed_review(dependencies):
 
     # Load latest versions from data file if it exists
     latest_cache = {}
-    data_file = Path("deps_data.txt")
+    data_file = Path(get_data_file_path("deps_data.txt"))
     if data_file.exists():
-        print(f"{Colors.GRAY}Loading latest versions from deps_data.txt cache (run 'export' to refresh)...{Colors.END}\n")
+        print(f"{Colors.GRAY}Loading latest versions from data cache (run 'export' to refresh)...{Colors.END}\n")
         with open(data_file, 'r') as f:
             for line in f:
                 if line.startswith("DEPENDENCY:"):
@@ -739,7 +757,7 @@ def detailed_review(dependencies):
                         latest_version = parts[1]
                         latest_cache[dep_name] = latest_version
     else:
-        print(f"{Colors.YELLOW}⚠️  No deps_data.txt found. Run 'deps.py export' first to cache latest versions.{Colors.END}\n")
+        print(f"{Colors.YELLOW}⚠️  No data cache found. Run 'repos.py export' first to cache latest versions.{Colors.END}\n")
 
     # Filter and sort dependencies
     filtered_deps = {}
@@ -967,7 +985,7 @@ def analyze_hub_status(dependencies):
 
     # Load latest versions from cache
     latest_cache = {}
-    data_file = Path("deps_data.txt")
+    data_file = Path(get_data_file_path("deps_data.txt"))
     if data_file.exists():
         with open(data_file, 'r') as f:
             for line in f:
@@ -1814,10 +1832,12 @@ class EcosystemData:
     latest: Dict[str, LatestData]  # keyed by pkg_name
     version_maps: Dict[int, VersionMapData]
 
-def hydrate_tsv_cache(cache_file: str = "deps_cache.tsv") -> EcosystemData:
+def hydrate_tsv_cache(cache_file: str = None) -> EcosystemData:
     """Load and parse structured TSV cache into organized data structures"""
+    if cache_file is None:
+        cache_file = get_data_file_path("deps_cache.tsv")
     if not Path(cache_file).exists():
-        raise FileNotFoundError(f"Cache file {cache_file} not found. Run './bin/deps.py data' to generate it.")
+        raise FileNotFoundError(f"Cache file {cache_file} not found. Run 'repos.py data' to generate it.")
 
     aggregation = {}
     repos = {}
@@ -2039,7 +2059,7 @@ def analyze_package_usage(dependencies):
 
     # Load latest versions from cache
     latest_cache = {}
-    data_file = Path("deps_data.txt")
+    data_file = Path(get_data_file_path("deps_data.txt"))
     if data_file.exists():
         with open(data_file, 'r') as f:
             for line in f:
@@ -2237,7 +2257,7 @@ def generate_data_cache(dependencies, fast_mode=False):
     print(f"Generated {len(version_maps)} version analysis entries")
 
     # Phase 6: Write TSV cache
-    output_file = "deps_cache.tsv"
+    output_file = get_data_file_path("deps_cache.tsv")
     print(f"{Colors.CYAN}Phase 6: Writing cache to {output_file}...{Colors.END}")
     write_tsv_cache(repos, deps, latest_versions, version_maps, output_file)
 
@@ -2344,6 +2364,68 @@ def view_conflicts(ecosystem: EcosystemData) -> None:
     print(f"  Packages with conflicts: {Colors.BOLD}{len(conflict_packages)}{Colors.END}")
     print(f"  Total version variants: {Colors.BOLD}{total_conflicts}{Colors.END}")
     print(f"  Ecosystem health: {Colors.YELLOW}⚠️  Requires attention{Colors.END}")
+
+
+def view_repos(ecosystem: EcosystemData) -> None:
+    """Lightning-fast repository listing using hydrated data"""
+    print(f"{Colors.CYAN}{Colors.BOLD}🗂️  RUST ECOSYSTEM REPOSITORIES{Colors.END}")
+    print(f"{Colors.CYAN}{'='*80}{Colors.END}")
+
+    repos_count = len(ecosystem.repos)
+    if repos_count == 0:
+        print(f"\n{Colors.YELLOW}⚠️  No repositories found in ecosystem{Colors.END}")
+        return
+
+    print(f"\n{Colors.GREEN}📊 Found {repos_count} repositories in ecosystem:{Colors.END}")
+
+    # Count dependencies per repo for additional info
+    deps_per_repo = {}
+    for dep in ecosystem.deps.values():
+        repo_id = dep.repo_id
+        if repo_id not in deps_per_repo:
+            deps_per_repo[repo_id] = 0
+        deps_per_repo[repo_id] += 1
+
+    # Group repos by parent project like conflicts view does
+    by_parent = {}
+    for repo_id, repo in ecosystem.repos.items():
+        parent = repo.parent or "standalone"
+        if parent not in by_parent:
+            by_parent[parent] = []
+        by_parent[parent].append((repo_id, repo))
+
+    # Display repos grouped by parent with beautiful formatting like conflicts
+    for parent in sorted(by_parent.keys()):
+        repos_in_parent = by_parent[parent]
+
+        if parent == "standalone":
+            print(f"\n{Colors.PURPLE}{Colors.BOLD}📁 Standalone Projects:{Colors.END}")
+        else:
+            print(f"\n{Colors.PURPLE}{Colors.BOLD}📁 {parent}:{Colors.END}")
+
+        print(f"{Colors.GRAY}   {'Repository':<20} {'Version':<12} {'Dependencies':<12} {'Path'}{Colors.END}")
+        print(f"{Colors.GRAY}   {'-'*70}{Colors.END}")
+
+        for repo_id, repo in sorted(repos_in_parent, key=lambda x: x[1].repo_name):
+            repo_name = f"{repo.repo_name:<20}"
+            version = f"{repo.cargo_version or 'unknown':<12}"
+            dep_count = deps_per_repo.get(repo_id, 0)
+            deps_str = f"{dep_count} deps"
+            deps_colored = f"{Colors.BLUE}{deps_str:<12}{Colors.END}" if dep_count > 0 else f"{Colors.GRAY}{deps_str:<12}{Colors.END}"
+            path_str = f"{Colors.WHITE}{repo.path}{Colors.END}"
+
+            print(f"   {Colors.WHITE}{repo_name}{Colors.END} {Colors.GREEN}{version}{Colors.END} {deps_colored} {path_str}")
+
+    # Summary statistics like conflicts view
+    total_deps = sum(deps_per_repo.values())
+    avg_deps = total_deps / repos_count if repos_count > 0 else 0
+
+    print(f"\n{Colors.PURPLE}{Colors.BOLD}Repository Summary:{Colors.END}")
+    print(f"  Total repositories: {Colors.BOLD}{repos_count}{Colors.END}")
+    print(f"  Total dependencies: {Colors.BOLD}{total_deps}{Colors.END}")
+    print(f"  Average deps per repo: {Colors.BOLD}{avg_deps:.1f}{Colors.END}")
+    print(f"  Parent projects: {Colors.BOLD}{len(by_parent)}{Colors.END}")
+
 
 def view_package_detail(ecosystem: EcosystemData, pkg_name: str) -> None:
     """Lightning-fast package analysis using hydrated data
@@ -2579,7 +2661,7 @@ def view_review(ecosystem: EcosystemData) -> None:
     print(f"{Colors.GRAY}Status of each dependency across all Rust projects (ignoring hub){Colors.END}")
     print(f"{Colors.GRAY}{'='*80}{Colors.END}\n")
 
-    print(f"{Colors.GRAY}Loading latest versions from deps_data.txt cache (run 'export' to refresh)...{Colors.END}\n")
+    print(f"{Colors.GRAY}Loading latest versions from data cache (run 'export' to refresh)...{Colors.END}\n")
 
     # Table header
     print(f"{Colors.WHITE}{Colors.BOLD}{'Package':<20} {'#U':<4} {'Ecosystem':<14} {'Latest':<20} {'Breaking'}{Colors.END}")
@@ -3850,7 +3932,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Rust dependency analyzer with enhanced commands")
     parser.add_argument('command', nargs='?', default='conflicts',
-                       choices=['conflicts', 'query', 'review', 'hub', 'pkg', 'export', 'data', 'superclean', 'ls', 'legacy',
+                       choices=['repos', 'conflicts', 'query', 'review', 'hub', 'pkg', 'export', 'data', 'superclean', 'ls', 'legacy',
                                'stats', 'deps', 'outdated', 'search', 'graph'],
                        help='Command to run')
     parser.add_argument('package', nargs='?', help='Package name for pkg/latest/search/graph commands or repo name for deps command')
@@ -3878,7 +3960,9 @@ def main():
                 ecosystem = hydrate_tsv_cache()
                 print(f"✅ Hydration successful: {len(ecosystem.deps)} deps, {len(ecosystem.repos)} repos")
 
-                if args.command == 'conflicts':
+                if args.command == 'repos':
+                    view_repos(ecosystem)
+                elif args.command == 'conflicts':
                     view_conflicts(ecosystem)
                 elif args.command == 'query':
                     view_query(ecosystem)
@@ -3891,7 +3975,7 @@ def main():
                         view_package_detail(ecosystem, args.package)
                     else:
                         print(f"{Colors.RED}❌ Package name required for pkg command{Colors.END}")
-                        print(f"Usage: ./repos.py pkg <package-name>")
+                        print(f"Usage: repos.py pkg <package-name>")
                         return
                 elif args.command == 'stats':
                     view_stats(ecosystem)
@@ -3900,7 +3984,7 @@ def main():
                         view_repo_deps(ecosystem, args.package)
                     else:
                         print(f"{Colors.RED}❌ Repository name required for deps command{Colors.END}")
-                        print(f"Usage: ./repos.py deps <repo-name>")
+                        print(f"Usage: repos.py deps <repo-name>")
                         return
                 elif args.command == 'outdated':
                     view_outdated(ecosystem)
@@ -3909,14 +3993,14 @@ def main():
                         view_search(ecosystem, args.package)
                     else:
                         print(f"{Colors.RED}❌ Search pattern required for search command{Colors.END}")
-                        print(f"Usage: ./repos.py search <pattern>")
+                        print(f"Usage: repos.py search <pattern>")
                         return
                 elif args.command == 'graph':
                     if args.package:
                         view_graph(ecosystem, args.package)
                     else:
                         print(f"{Colors.RED}❌ Package name required for graph command{Colors.END}")
-                        print(f"Usage: ./repos.py graph <package-name>")
+                        print(f"Usage: repos.py graph <package-name>")
                         return
             except Exception as e:
                 print(f"❌ Error in {args.command} command: {e}")

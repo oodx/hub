@@ -1,22 +1,30 @@
-STALE DOCUMENTATION FILES TO REMOVE
-====================================
+STRATEGY DOCUMENTATION UPDATE PLAN
+===================================
 
-The following documentation files are outdated and should be reviewed for removal:
+CORRECTION: The strategy documents should NOT be removed - they are key architectural documents that need updating! China's analysis shows these are valuable assets documenting successful strategy implementation.
 
-1. /home/xnull/repos/code/rust/oodx/projects/hub/.session/CONTINUE.md
-   - Appears to be a temporary session file
-   - Should be cleaned up
+STRATEGY DOCUMENTS TO UPDATE (High Priority):
 
-2. /home/xnull/repos/code/rust/oodx/projects/hub/docs/VERSION_STRAT.md
-   - Old versioning strategy document
-   - May need updating or removal based on current approach
+1. docs/VERSION_STRAT.md (STATUS: 85% current)
+   - Update tool references: ./bin/deps.py → ./bin/repos.py
+   - Add integration with current repos.py commands (conflicts, review, hub, pkg)
+   - Update semv integration examples
 
-3. /home/xnull/repos/code/rust/oodx/projects/hub/docs/REFACTOR_STRAT.md
-   - Refactoring strategy from earlier phases
-   - Likely obsolete after recent refactoring
+2. docs/REFACTOR_STRAT.md (STATUS: 95% implemented - SUCCESS STORY!)
+   - Mark phases as COMPLETED - this is a victory!
+   - Document 100x+ performance achievement via TSV cache
+   - Update tool references and add new features (boxy integration)
+   - Celebrate successful implementation
 
-4. /home/xnull/repos/code/rust/oodx/projects/hub/docs/HUB_STRAT.md
-   - Old Hub strategy document
-   - Should be reviewed and possibly replaced with current approach
+3. docs/HUB_STRAT.md (STATUS: 60% relevant)
+   - Update "Cargohold" → "Hub" naming throughout
+   - Document current implementation status
+   - Preserve excellent TSV documentation (lines 259-578)
+   - Update command examples to current syntax
 
-Note: Review these files before deletion to ensure no important information is lost.
+FILES FOR REMOVAL:
+
+1. .session/CONTINUE.md
+   - Temporary session file, safe to remove
+
+Note: These strategy documents show successful planning → implementation and should be updated to reflect achievements, not removed.

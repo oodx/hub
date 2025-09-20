@@ -162,7 +162,7 @@ semver-policy = "strict"             # SemVer adherence: strict/relaxed
 ### **Version Analysis**
 - **`cargo outdated`** - Check for available updates
 - **`cargo audit`** - Security vulnerability scanning
-- **`./bin/deps.py`** - Ecosystem dependency analysis
+- **`./bin/repos.py`** - Hub ecosystem repository and dependency analysis
 - **`semv`** - Semantic version management (see semv integration)
 
 ### **Testing Automation**
@@ -218,7 +218,8 @@ semv sync                    # Sync versions across files
 ### **Hub Ecosystem Coordination**
 ```bash
 # Before major dependency updates:
-./bin/deps.py eco            # Check ecosystem status
+./bin/repos.py conflicts      # Check version conflicts
+./bin/repos.py hub            # Hub ecosystem status
 semv pend                    # Review pending changes
 semv next                    # Confirm version impact
 
@@ -234,16 +235,63 @@ semv next                    # Would show v1.0.0 (major bump)
 ### **Version Strategy Alignment**
 - **semv detects**: Commit patterns → version type
 - **VERSION_STRAT.md defines**: What constitutes breaking vs. non-breaking
-- **./bin/deps.py provides**: Ecosystem impact analysis
+- **./bin/repos.py provides**: Comprehensive ecosystem analysis
 - **Combined workflow**: Safe, coordinated version management
 
 ### **Hub Development Workflow**
-1. **Check ecosystem**: `./bin/deps.py eco` - understand current state
+1. **Check ecosystem**: `./bin/repos.py conflicts` and `./bin/repos.py hub` - understand current state
 2. **Make changes**: Following VERSION_STRAT.md guidelines
 3. **Commit with labels**: Use semv-compatible commit messages
 4. **Review impact**: `semv pend` and `semv next`
 5. **Coordinate updates**: Ensure hub consumers can handle changes
 6. **Release**: `semv bump` for coordinated ecosystem release
+
+---
+
+## Integration with Current Hub Tools
+
+### repos.py Command Integration
+The hub ecosystem uses `./bin/repos.py` for all dependency analysis and ecosystem management:
+
+```bash
+# Version conflict detection and analysis
+./bin/repos.py conflicts    # Replaces manual conflict checking
+./bin/repos.py stats        # Ecosystem overview and metrics
+
+# Dependency review workflow
+./bin/repos.py review       # Enhanced review with latest versions
+./bin/repos.py outdated     # Packages with available updates
+
+# Hub status dashboard
+./bin/repos.py hub          # Hub integration status and gaps
+
+# Package-specific analysis
+./bin/repos.py pkg <name>   # Deep dive into specific packages
+./bin/repos.py deps <repo>  # Repository dependency analysis
+./bin/repos.py search <pattern>  # Package search across ecosystem
+./bin/repos.py graph <package>   # Dependency relationship mapping
+```
+
+### Enhanced Version Management Workflow
+```bash
+# 1. Analyze current ecosystem state
+./bin/repos.py conflicts    # Identify version conflicts
+./bin/repos.py outdated     # Check for available updates
+
+# 2. Review specific package impacts
+./bin/repos.py pkg serde    # Analyze specific package usage
+./bin/repos.py graph serde  # Map dependency relationships
+
+# 3. Make version changes following SemVer strategy
+git commit -m "feat: update serde with backward compatibility"
+
+# 4. Validate ecosystem after changes
+./bin/repos.py hub          # Check hub integration status
+./bin/repos.py review       # Full ecosystem review
+
+# 5. Use semv for coordinated releases
+semv bump                   # Create version tag
+```
 
 ---
 
