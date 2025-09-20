@@ -46,7 +46,7 @@ import shutil
 import tempfile
 
 # Boxy integration helper
-USE_BOXY = os.environ.get('REPOS_USE_BOXY', '1') == '0'  # Shell convention: 0=true, 1=false
+USE_BOXY = os.environ.get('REPOS_USE_BOXY', '0') == '0'  # Shell convention: 0=true (default enabled), 1=false
 BOXY_AVAILABLE = False
 
 def check_boxy_availability():
@@ -3056,11 +3056,6 @@ def view_repo_deps(ecosystem: EcosystemData, repo_name: str) -> None:
 
     repo = matching_repos[0]
 
-    print(f"\n{Colors.CYAN}{Colors.BOLD}📦 DEPENDENCIES: {repo.repo_name}{Colors.END}")
-    print(f"{Colors.GRAY}{'-'*80}{Colors.END}")
-    print(f"Path: {repo.path}")
-    print(f"Hub Status: {Colors.GREEN if repo.hub_status == 'HUB' else Colors.YELLOW}{repo.hub_status}{Colors.END}")
-
     # Get dependencies for this repo
     repo_deps = []
     for dep in ecosystem.deps.values():
@@ -3068,44 +3063,99 @@ def view_repo_deps(ecosystem: EcosystemData, repo_name: str) -> None:
         if dep_repo and dep_repo.path == repo.path:
             repo_deps.append(dep)
 
-    if not repo_deps:
-        print(f"\n{Colors.YELLOW}No dependencies found{Colors.END}")
-        return
+    if BOXY_AVAILABLE:
+        # Collect output for boxy rendering
+        output_lines = []
 
-    # Group by dependency type
-    normal_deps = [d for d in repo_deps if d.dep_type == "dependencies"]
-    dev_deps = [d for d in repo_deps if d.dep_type == "dev-dependencies"]
-    build_deps = [d for d in repo_deps if d.dep_type == "build-dependencies"]
+        output_lines.append(f"Path: {repo.path}")
+        output_lines.append(f"Hub Status: {Colors.GREEN if repo.hub_status == 'HUB' else Colors.YELLOW}{repo.hub_status}{Colors.END}")
 
-    def print_dep_list(deps, title):
-        if deps:
-            print(f"\n{Colors.YELLOW}{title} ({len(deps)}):{Colors.END}")
-            for dep in sorted(deps, key=lambda d: d.pkg_name):
-                latest = ecosystem.latest.get(dep.pkg_name)
-                version_color = Colors.GREEN
-                update_marker = ""
+        if not repo_deps:
+            output_lines.append(f"\n{Colors.YELLOW}No dependencies found{Colors.END}")
+        else:
+            # Group by dependency type
+            normal_deps = [d for d in repo_deps if d.dep_type == "dep"]
+            dev_deps = [d for d in repo_deps if d.dep_type == "dev-dep"]
+            # Note: build-dependencies don't appear in the TSV cache
+            build_deps = []
 
-                if latest and dep.pkg_version != latest.latest_version and latest.latest_version != "LOCAL":
-                    if is_breaking_change(dep.pkg_version, latest.latest_version):
-                        version_color = Colors.RED
-                        update_marker = f" → {Colors.RED}{latest.latest_version}{Colors.END}"
-                    else:
-                        version_color = Colors.YELLOW
-                        update_marker = f" → {Colors.YELLOW}{latest.latest_version}{Colors.END}"
+            def add_dep_list(deps, title):
+                if deps:
+                    output_lines.append("")
+                    output_lines.append(f"{Colors.YELLOW}{title} ({len(deps)}):{Colors.END}")
+                    for dep in sorted(deps, key=lambda d: d.pkg_name):
+                        latest = ecosystem.latest.get(dep.pkg_name)
+                        version_color = Colors.GREEN
+                        update_marker = ""
 
-                features = f" [{dep.features}]" if dep.features and dep.features != "[]" else ""
-                print(f"  {Colors.BLUE}•{Colors.END} {dep.pkg_name}: {version_color}{dep.pkg_version}{Colors.END}{features}{update_marker}")
+                        if latest and dep.pkg_version != latest.latest_version and latest.latest_version != "LOCAL":
+                            if is_breaking_change(dep.pkg_version, latest.latest_version):
+                                version_color = Colors.RED
+                                update_marker = f" → {Colors.RED}{latest.latest_version}{Colors.END}"
+                            else:
+                                version_color = Colors.YELLOW
+                                update_marker = f" → {Colors.YELLOW}{latest.latest_version}{Colors.END}"
 
-    print_dep_list(normal_deps, "Dependencies")
-    print_dep_list(dev_deps, "Dev Dependencies")
-    print_dep_list(build_deps, "Build Dependencies")
+                        features = f" [{dep.features}]" if dep.features and dep.features != "[]" and dep.features != "NONE" else ""
+                        output_lines.append(f"  {Colors.BLUE}•{Colors.END} {dep.pkg_name}: {version_color}{dep.pkg_version}{Colors.END}{features}{update_marker}")
 
-    print(f"\n{Colors.GREEN}Total: {len(repo_deps)} dependencies{Colors.END}")
+            add_dep_list(normal_deps, "Dependencies")
+            add_dep_list(dev_deps, "Dev Dependencies")
+            add_dep_list(build_deps, "Build Dependencies")
+
+            output_lines.append("")
+            output_lines.append(f"{Colors.GREEN}Total: {len(repo_deps)} dependencies{Colors.END}")
+
+        # Render with boxy
+        content = "\n".join(output_lines)
+        theme = get_command_theme("deps")
+        result = render_with_boxy(content, title=f"📦 Dependencies: {repo.repo_name}", theme=theme, header="Repository Analysis", width="80")
+        print(result)
+
+    else:
+        # Original output without boxy
+        print(f"\n{Colors.CYAN}{Colors.BOLD}📦 DEPENDENCIES: {repo.repo_name}{Colors.END}")
+        print(f"{Colors.GRAY}{'-'*80}{Colors.END}")
+        print(f"Path: {repo.path}")
+        print(f"Hub Status: {Colors.GREEN if repo.hub_status == 'HUB' else Colors.YELLOW}{repo.hub_status}{Colors.END}")
+
+        if not repo_deps:
+            print(f"\n{Colors.YELLOW}No dependencies found{Colors.END}")
+            return
+
+        # Group by dependency type
+        normal_deps = [d for d in repo_deps if d.dep_type == "dep"]
+        dev_deps = [d for d in repo_deps if d.dep_type == "dev-dep"]
+        # Note: build-dependencies don't appear in the TSV cache
+        build_deps = []
+
+        def print_dep_list(deps, title):
+            if deps:
+                print(f"\n{Colors.YELLOW}{title} ({len(deps)}):{Colors.END}")
+                for dep in sorted(deps, key=lambda d: d.pkg_name):
+                    latest = ecosystem.latest.get(dep.pkg_name)
+                    version_color = Colors.GREEN
+                    update_marker = ""
+
+                    if latest and dep.pkg_version != latest.latest_version and latest.latest_version != "LOCAL":
+                        if is_breaking_change(dep.pkg_version, latest.latest_version):
+                            version_color = Colors.RED
+                            update_marker = f" → {Colors.RED}{latest.latest_version}{Colors.END}"
+                        else:
+                            version_color = Colors.YELLOW
+                            update_marker = f" → {Colors.YELLOW}{latest.latest_version}{Colors.END}"
+
+                    features = f" [{dep.features}]" if dep.features and dep.features != "[]" else ""
+                    print(f"  {Colors.BLUE}•{Colors.END} {dep.pkg_name}: {version_color}{dep.pkg_version}{Colors.END}{features}{update_marker}")
+
+        print_dep_list(normal_deps, "Dependencies")
+        print_dep_list(dev_deps, "Dev Dependencies")
+        print_dep_list(build_deps, "Build Dependencies")
+
+        print(f"\n{Colors.GREEN}Total: {len(repo_deps)} dependencies{Colors.END}")
 
 def view_outdated(ecosystem: EcosystemData) -> None:
     """Display packages with available updates"""
-    print(f"\n{Colors.CYAN}{Colors.BOLD}🔄 OUTDATED PACKAGES{Colors.END}")
-    print(f"{Colors.GRAY}{'-'*80}{Colors.END}")
 
     # Collect outdated packages
     outdated = {}
@@ -3123,61 +3173,120 @@ def view_outdated(ecosystem: EcosystemData) -> None:
             if repo and repo.repo_name not in outdated[dep.pkg_name]['repos']:
                 outdated[dep.pkg_name]['repos'].append(repo.repo_name)
 
-    if not outdated:
-        print(f"{Colors.GREEN}✅ All packages are up to date!{Colors.END}")
-        return
+    if BOXY_AVAILABLE:
+        # Collect output for boxy rendering
+        output_lines = []
 
-    # Separate breaking and non-breaking updates
-    breaking_updates = []
-    minor_updates = []
-
-    for pkg, info in outdated.items():
-        has_breaking = False
-        for current in info['current_versions']:
-            if is_breaking_change(current, info['latest']):
-                has_breaking = True
-                break
-
-        if has_breaking:
-            breaking_updates.append((pkg, info))
+        if not outdated:
+            output_lines.append(f"{Colors.GREEN}✅ All packages are up to date!{Colors.END}")
         else:
-            minor_updates.append((pkg, info))
+            # Separate breaking and non-breaking updates
+            breaking_updates = []
+            minor_updates = []
 
-    # Display breaking updates
-    if breaking_updates:
-        print(f"\n{Colors.RED}{Colors.BOLD}⚠️  BREAKING UPDATES ({len(breaking_updates)}):{Colors.END}")
-        for pkg, info in sorted(breaking_updates):
-            versions = ', '.join(sorted(info['current_versions']))
-            print(f"\n  {Colors.BOLD}{pkg}{Colors.END}")
-            print(f"    Current: {Colors.YELLOW}{versions}{Colors.END}")
-            print(f"    Latest:  {Colors.GREEN}{info['latest']}{Colors.END}")
-            print(f"    Used in: {', '.join(info['repos'][:5])}")
-            if len(info['repos']) > 5:
-                print(f"             ... and {len(info['repos']) - 5} more")
+            for pkg, info in outdated.items():
+                has_breaking = False
+                for current in info['current_versions']:
+                    if is_breaking_change(current, info['latest']):
+                        has_breaking = True
+                        break
 
-    # Display minor updates
-    if minor_updates:
-        print(f"\n{Colors.YELLOW}{Colors.BOLD}📦 MINOR UPDATES ({len(minor_updates)}):{Colors.END}")
-        for pkg, info in sorted(minor_updates):
-            versions = ', '.join(sorted(info['current_versions']))
-            print(f"\n  {Colors.BOLD}{pkg}{Colors.END}")
-            print(f"    Current: {Colors.BLUE}{versions}{Colors.END}")
-            print(f"    Latest:  {Colors.GREEN}{info['latest']}{Colors.END}")
-            print(f"    Used in: {', '.join(info['repos'][:3])}")
-            if len(info['repos']) > 3:
-                print(f"             ... and {len(info['repos']) - 3} more")
+                if has_breaking:
+                    breaking_updates.append((pkg, info))
+                else:
+                    minor_updates.append((pkg, info))
 
-    print(f"\n{Colors.GRAY}Run 'cargo update' in affected repositories to update non-breaking changes{Colors.END}")
+            # Add breaking updates
+            if breaking_updates:
+                output_lines.append(f"{Colors.RED}{Colors.BOLD}⚠️  BREAKING UPDATES ({len(breaking_updates)}):{Colors.END}")
+                for pkg, info in sorted(breaking_updates):
+                    versions = ', '.join(sorted(info['current_versions']))
+                    output_lines.append("")
+                    output_lines.append(f"  {Colors.BOLD}{pkg}{Colors.END}")
+                    output_lines.append(f"    Current: {Colors.YELLOW}{versions}{Colors.END}")
+                    output_lines.append(f"    Latest:  {Colors.GREEN}{info['latest']}{Colors.END}")
+                    output_lines.append(f"    Used in: {', '.join(info['repos'][:5])}")
+                    if len(info['repos']) > 5:
+                        output_lines.append(f"             ... and {len(info['repos']) - 5} more")
+
+            # Add minor updates
+            if minor_updates:
+                if breaking_updates:
+                    output_lines.append("")
+                output_lines.append(f"{Colors.YELLOW}{Colors.BOLD}📦 MINOR UPDATES ({len(minor_updates)}):{Colors.END}")
+                for pkg, info in sorted(minor_updates):
+                    versions = ', '.join(sorted(info['current_versions']))
+                    output_lines.append("")
+                    output_lines.append(f"  {Colors.BOLD}{pkg}{Colors.END}")
+                    output_lines.append(f"    Current: {Colors.BLUE}{versions}{Colors.END}")
+                    output_lines.append(f"    Latest:  {Colors.GREEN}{info['latest']}{Colors.END}")
+                    output_lines.append(f"    Used in: {', '.join(info['repos'][:3])}")
+                    if len(info['repos']) > 3:
+                        output_lines.append(f"             ... and {len(info['repos']) - 3} more")
+
+            output_lines.append("")
+            output_lines.append(f"{Colors.GRAY}Run 'cargo update' in affected repositories to update non-breaking changes{Colors.END}")
+
+        # Render with boxy
+        content = "\n".join(output_lines)
+        theme = get_command_theme("outdated")
+        result = render_with_boxy(content, title="🔄 Outdated Packages", theme=theme, header="Update Analysis", width="80")
+        print(result)
+
+    else:
+        # Original output without boxy
+        print(f"\n{Colors.CYAN}{Colors.BOLD}🔄 OUTDATED PACKAGES{Colors.END}")
+        print(f"{Colors.GRAY}{'-'*80}{Colors.END}")
+
+        if not outdated:
+            print(f"{Colors.GREEN}✅ All packages are up to date!{Colors.END}")
+            return
+
+        # Separate breaking and non-breaking updates
+        breaking_updates = []
+        minor_updates = []
+
+        for pkg, info in outdated.items():
+            has_breaking = False
+            for current in info['current_versions']:
+                if is_breaking_change(current, info['latest']):
+                    has_breaking = True
+                    break
+
+            if has_breaking:
+                breaking_updates.append((pkg, info))
+            else:
+                minor_updates.append((pkg, info))
+
+        # Display breaking updates
+        if breaking_updates:
+            print(f"\n{Colors.RED}{Colors.BOLD}⚠️  BREAKING UPDATES ({len(breaking_updates)}):{Colors.END}")
+            for pkg, info in sorted(breaking_updates):
+                versions = ', '.join(sorted(info['current_versions']))
+                print(f"\n  {Colors.BOLD}{pkg}{Colors.END}")
+                print(f"    Current: {Colors.YELLOW}{versions}{Colors.END}")
+                print(f"    Latest:  {Colors.GREEN}{info['latest']}{Colors.END}")
+                print(f"    Used in: {', '.join(info['repos'][:5])}")
+                if len(info['repos']) > 5:
+                    print(f"             ... and {len(info['repos']) - 5} more")
+
+        # Display minor updates
+        if minor_updates:
+            print(f"\n{Colors.YELLOW}{Colors.BOLD}📦 MINOR UPDATES ({len(minor_updates)}):{Colors.END}")
+            for pkg, info in sorted(minor_updates):
+                versions = ', '.join(sorted(info['current_versions']))
+                print(f"\n  {Colors.BOLD}{pkg}{Colors.END}")
+                print(f"    Current: {Colors.BLUE}{versions}{Colors.END}")
+                print(f"    Latest:  {Colors.GREEN}{info['latest']}{Colors.END}")
+                print(f"    Used in: {', '.join(info['repos'][:3])}")
+                if len(info['repos']) > 3:
+                    print(f"             ... and {len(info['repos']) - 3} more")
+
+        print(f"\n{Colors.GRAY}Run 'cargo update' in affected repositories to update non-breaking changes{Colors.END}")
 
 def view_search(ecosystem: EcosystemData, pattern: str) -> None:
     """Search for packages matching a pattern"""
     import re
-
-    if BOXY_AVAILABLE:
-        output_lines = []
-    else:
-        print(f"\n{Colors.CYAN}{Colors.BOLD}🔍 PACKAGE SEARCH: '{pattern}'{Colors.END}")
-        print(f"{Colors.GRAY}{'-'*80}{Colors.END}")
 
     # Compile pattern for fuzzy matching
     try:
@@ -3209,46 +3318,94 @@ def view_search(ecosystem: EcosystemData, pattern: str) -> None:
                 if hasattr(dep, 'hub_status'):
                     matching_packages[dep.pkg_name]['hub_status'].add(dep.hub_status)
 
-    if not matching_packages:
-        print(f"{Colors.YELLOW}No packages found matching '{pattern}'{Colors.END}")
-        return
+    if BOXY_AVAILABLE:
+        # Collect output for boxy rendering
+        output_lines = []
 
-    # Sort by usage count
-    sorted_packages = sorted(matching_packages.items(),
-                           key=lambda x: len(x[1]['repos']), reverse=True)
-
-    print(f"\n{Colors.GREEN}Found {len(matching_packages)} matching packages:{Colors.END}\n")
-
-    for pkg, info in sorted_packages[:20]:  # Show top 20 matches
-        # Highlight matched portion
-        highlighted = regex.sub(lambda m: f"{Colors.YELLOW}{m.group()}{Colors.END}", pkg)
-
-        # Determine status color
-        if "HUB" in info['hub_status']:
-            status_color = Colors.GREEN
-            status = "HUB"
-        elif "HUB_ONLY" in info['hub_status']:
-            status_color = Colors.BLUE
-            status = "HUB_ONLY"
+        if not matching_packages:
+            output_lines.append(f"{Colors.YELLOW}No packages found matching '{pattern}'{Colors.END}")
         else:
-            status_color = Colors.GRAY
-            status = "EXTERNAL"
+            # Sort by usage count
+            sorted_packages = sorted(matching_packages.items(),
+                                   key=lambda x: len(x[1]['repos']), reverse=True)
 
-        versions = ', '.join(sorted(info['versions'])[:3])
-        if len(info['versions']) > 3:
-            versions += f", +{len(info['versions']) - 3}"
+            output_lines.append(f"{Colors.GREEN}Found {len(matching_packages)} matching packages:{Colors.END}")
+            output_lines.append("")
 
-        print(f"  {Colors.BOLD}{highlighted}{Colors.END} {status_color}[{status}]{Colors.END}")
-        print(f"    Used in: {len(info['repos'])} repos | Versions: {versions}")
+            for pkg, info in sorted_packages[:20]:  # Show top 20 matches
+                # Highlight matched portion
+                highlighted = regex.sub(lambda m: f"{Colors.YELLOW}{m.group()}{Colors.END}", pkg)
 
-    if len(matching_packages) > 20:
-        print(f"\n{Colors.GRAY}... and {len(matching_packages) - 20} more matches{Colors.END}")
+                # Determine status color
+                if "HUB" in info['hub_status']:
+                    status_color = Colors.GREEN
+                    status = "HUB"
+                elif "HUB_ONLY" in info['hub_status']:
+                    status_color = Colors.BLUE
+                    status = "HUB_ONLY"
+                else:
+                    status_color = Colors.GRAY
+                    status = "EXTERNAL"
+
+                versions = ', '.join(sorted(info['versions'])[:3])
+                if len(info['versions']) > 3:
+                    versions += f", +{len(info['versions']) - 3}"
+
+                output_lines.append(f"  {Colors.BOLD}{highlighted}{Colors.END} {status_color}[{status}]{Colors.END}")
+                output_lines.append(f"    Used in: {len(info['repos'])} repos | Versions: {versions}")
+
+            if len(matching_packages) > 20:
+                output_lines.append("")
+                output_lines.append(f"{Colors.GRAY}... and {len(matching_packages) - 20} more matches{Colors.END}")
+
+        # Render with boxy
+        content = "\n".join(output_lines)
+        theme = get_command_theme("search")
+        result = render_with_boxy(content, title=f"🔍 Package Search: '{pattern}'", theme=theme, header="Search Results", width="80")
+        print(result)
+
+    else:
+        # Original output without boxy
+        print(f"\n{Colors.CYAN}{Colors.BOLD}🔍 PACKAGE SEARCH: '{pattern}'{Colors.END}")
+        print(f"{Colors.GRAY}{'-'*80}{Colors.END}")
+
+        if not matching_packages:
+            print(f"{Colors.YELLOW}No packages found matching '{pattern}'{Colors.END}")
+            return
+
+        # Sort by usage count
+        sorted_packages = sorted(matching_packages.items(),
+                               key=lambda x: len(x[1]['repos']), reverse=True)
+
+        print(f"\n{Colors.GREEN}Found {len(matching_packages)} matching packages:{Colors.END}\n")
+
+        for pkg, info in sorted_packages[:20]:  # Show top 20 matches
+            # Highlight matched portion
+            highlighted = regex.sub(lambda m: f"{Colors.YELLOW}{m.group()}{Colors.END}", pkg)
+
+            # Determine status color
+            if "HUB" in info['hub_status']:
+                status_color = Colors.GREEN
+                status = "HUB"
+            elif "HUB_ONLY" in info['hub_status']:
+                status_color = Colors.BLUE
+                status = "HUB_ONLY"
+            else:
+                status_color = Colors.GRAY
+                status = "EXTERNAL"
+
+            versions = ', '.join(sorted(info['versions'])[:3])
+            if len(info['versions']) > 3:
+                versions += f", +{len(info['versions']) - 3}"
+
+            print(f"  {Colors.BOLD}{highlighted}{Colors.END} {status_color}[{status}]{Colors.END}")
+            print(f"    Used in: {len(info['repos'])} repos | Versions: {versions}")
+
+        if len(matching_packages) > 20:
+            print(f"\n{Colors.GRAY}... and {len(matching_packages) - 20} more matches{Colors.END}")
 
 def view_graph(ecosystem: EcosystemData, package: str) -> None:
     """Show dependency graph for a package"""
-    print(f"\n{Colors.CYAN}{Colors.BOLD}🌳 DEPENDENCY GRAPH: {package}{Colors.END}")
-    print(f"{Colors.GRAY}{'-'*80}{Colors.END}")
-
     # Find exact package match
     package_deps = [dep for dep in ecosystem.deps.values() if dep.pkg_name == package]
 
@@ -3265,68 +3422,148 @@ def view_graph(ecosystem: EcosystemData, package: str) -> None:
             print(f"{Colors.RED}❌ Package '{package}' not found{Colors.END}")
         return
 
-    # Build dependency relationships
-    print(f"\n{Colors.YELLOW}📦 Package: {Colors.BOLD}{package}{Colors.END}")
+    if BOXY_AVAILABLE:
+        # Collect output for boxy rendering
+        output_lines = []
 
-    # Get latest version info
-    latest = ecosystem.latest.get(package)
-    if latest:
-        print(f"Latest Version: {Colors.GREEN}{latest.latest_version}{Colors.END}")
+        # Build dependency relationships
+        output_lines.append(f"{Colors.YELLOW}📦 Package: {Colors.BOLD}{package}{Colors.END}")
 
-    # Show which repos use this package
-    using_repos = {}
-    for dep in package_deps:
-        repo = ecosystem.repos.get(dep.repo_id)
-        if repo:
-            if repo.repo_name not in using_repos:
-                using_repos[repo.repo_name] = []
-            using_repos[repo.repo_name].append({
-                'version': dep.pkg_version,
-                'type': dep.dep_type,
-                'features': dep.features
-            })
+        # Get latest version info
+        latest = ecosystem.latest.get(package)
+        if latest:
+            output_lines.append(f"Latest Version: {Colors.GREEN}{latest.latest_version}{Colors.END}")
 
-    print(f"\n{Colors.YELLOW}Used by {len(using_repos)} repositories:{Colors.END}")
-    for repo_name, deps in sorted(using_repos.items())[:10]:
-        for dep_info in deps:
-            dep_type_marker = ""
-            if dep_info['type'] == "dev-dependencies":
-                dep_type_marker = " [dev]"
-            elif dep_info['type'] == "build-dependencies":
-                dep_type_marker = " [build]"
+        # Show which repos use this package
+        using_repos = {}
+        for dep in package_deps:
+            repo = ecosystem.repos.get(dep.repo_id)
+            if repo:
+                if repo.repo_name not in using_repos:
+                    using_repos[repo.repo_name] = []
+                using_repos[repo.repo_name].append({
+                    'version': dep.pkg_version,
+                    'type': dep.dep_type,
+                    'features': dep.features
+                })
 
-            features = f" {{{dep_info['features']}}}" if dep_info['features'] and dep_info['features'] != "[]" else ""
+        output_lines.append("")
+        output_lines.append(f"{Colors.YELLOW}Used by {len(using_repos)} repositories:{Colors.END}")
+        for repo_name, deps in sorted(using_repos.items())[:10]:
+            for dep_info in deps:
+                dep_type_marker = ""
+                if dep_info['type'] == "dev-dep":
+                    dep_type_marker = " [dev]"
+                elif dep_info['type'] == "build-dep":
+                    dep_type_marker = " [build]"
 
-            # Check if update available
-            update_marker = ""
-            if latest and dep_info['version'] != latest.latest_version and latest.latest_version != "LOCAL":
-                if is_breaking_change(dep_info['version'], latest.latest_version):
-                    update_marker = f" {Colors.RED}(breaking update available){Colors.END}"
-                else:
-                    update_marker = f" {Colors.YELLOW}(update available){Colors.END}"
+                features = f" {{{dep_info['features']}}}" if dep_info['features'] and dep_info['features'] != "[]" and dep_info['features'] != "NONE" else ""
 
-            print(f"  {Colors.BLUE}├─{Colors.END} {repo_name}: {Colors.GREEN}{dep_info['version']}{Colors.END}{dep_type_marker}{features}{update_marker}")
+                # Check if update available
+                update_marker = ""
+                if latest and dep_info['version'] != latest.latest_version and latest.latest_version != "LOCAL":
+                    if is_breaking_change(dep_info['version'], latest.latest_version):
+                        update_marker = f" {Colors.RED}(breaking update available){Colors.END}"
+                    else:
+                        update_marker = f" {Colors.YELLOW}(update available){Colors.END}"
 
-    if len(using_repos) > 10:
-        print(f"  {Colors.GRAY}... and {len(using_repos) - 10} more{Colors.END}")
+                output_lines.append(f"  {Colors.BLUE}├─{Colors.END} {repo_name}: {Colors.GREEN}{dep_info['version']}{Colors.END}{dep_type_marker}{features}{update_marker}")
 
-    # Show version distribution
-    version_counts = {}
-    for dep in package_deps:
-        version_counts[dep.pkg_version] = version_counts.get(dep.pkg_version, 0) + 1
+        if len(using_repos) > 10:
+            output_lines.append(f"  {Colors.GRAY}... and {len(using_repos) - 10} more{Colors.END}")
 
-    if len(version_counts) > 1:
-        print(f"\n{Colors.YELLOW}Version Distribution:{Colors.END}")
-        for version, count in sorted(version_counts.items(), key=lambda x: x[1], reverse=True):
-            bar_length = int((count / max(version_counts.values())) * 20)
-            bar = "█" * bar_length
-            status = ""
-            if latest and version != latest.latest_version and latest.latest_version != "LOCAL":
-                if is_breaking_change(version, latest.latest_version):
-                    status = f" {Colors.RED}(outdated - breaking){Colors.END}"
-                else:
-                    status = f" {Colors.YELLOW}(outdated){Colors.END}"
-            print(f"  {version:10} {Colors.GREEN}{bar}{Colors.END} ({count} repos){status}")
+        # Show version distribution
+        version_counts = {}
+        for dep in package_deps:
+            version_counts[dep.pkg_version] = version_counts.get(dep.pkg_version, 0) + 1
+
+        if len(version_counts) > 1:
+            output_lines.append("")
+            output_lines.append(f"{Colors.YELLOW}Version Distribution:{Colors.END}")
+            for version, count in sorted(version_counts.items(), key=lambda x: x[1], reverse=True):
+                bar_length = int((count / max(version_counts.values())) * 20)
+                bar = "█" * bar_length
+                status = ""
+                if latest and version != latest.latest_version and latest.latest_version != "LOCAL":
+                    if is_breaking_change(version, latest.latest_version):
+                        status = f" {Colors.RED}(outdated - breaking){Colors.END}"
+                    else:
+                        status = f" {Colors.YELLOW}(outdated){Colors.END}"
+                output_lines.append(f"  {version:10} {Colors.GREEN}{bar}{Colors.END} ({count} repos){status}")
+
+        # Render with boxy
+        content = "\n".join(output_lines)
+        theme = get_command_theme("graph")
+        result = render_with_boxy(content, title=f"🌳 Dependency Graph: {package}", theme=theme, header="Package Analysis", width="80")
+        print(result)
+
+    else:
+        # Original output without boxy
+        print(f"\n{Colors.CYAN}{Colors.BOLD}🌳 DEPENDENCY GRAPH: {package}{Colors.END}")
+        print(f"{Colors.GRAY}{'-'*80}{Colors.END}")
+
+        # Build dependency relationships
+        print(f"\n{Colors.YELLOW}📦 Package: {Colors.BOLD}{package}{Colors.END}")
+
+        # Get latest version info
+        latest = ecosystem.latest.get(package)
+        if latest:
+            print(f"Latest Version: {Colors.GREEN}{latest.latest_version}{Colors.END}")
+
+        # Show which repos use this package
+        using_repos = {}
+        for dep in package_deps:
+            repo = ecosystem.repos.get(dep.repo_id)
+            if repo:
+                if repo.repo_name not in using_repos:
+                    using_repos[repo.repo_name] = []
+                using_repos[repo.repo_name].append({
+                    'version': dep.pkg_version,
+                    'type': dep.dep_type,
+                    'features': dep.features
+                })
+
+        print(f"\n{Colors.YELLOW}Used by {len(using_repos)} repositories:{Colors.END}")
+        for repo_name, deps in sorted(using_repos.items())[:10]:
+            for dep_info in deps:
+                dep_type_marker = ""
+                if dep_info['type'] == "dev-dep":
+                    dep_type_marker = " [dev]"
+                elif dep_info['type'] == "build-dep":
+                    dep_type_marker = " [build]"
+
+                features = f" {{{dep_info['features']}}}" if dep_info['features'] and dep_info['features'] != "[]" and dep_info['features'] != "NONE" else ""
+
+                # Check if update available
+                update_marker = ""
+                if latest and dep_info['version'] != latest.latest_version and latest.latest_version != "LOCAL":
+                    if is_breaking_change(dep_info['version'], latest.latest_version):
+                        update_marker = f" {Colors.RED}(breaking update available){Colors.END}"
+                    else:
+                        update_marker = f" {Colors.YELLOW}(update available){Colors.END}"
+
+                print(f"  {Colors.BLUE}├─{Colors.END} {repo_name}: {Colors.GREEN}{dep_info['version']}{Colors.END}{dep_type_marker}{features}{update_marker}")
+
+        if len(using_repos) > 10:
+            print(f"  {Colors.GRAY}... and {len(using_repos) - 10} more{Colors.END}")
+
+        # Show version distribution
+        version_counts = {}
+        for dep in package_deps:
+            version_counts[dep.pkg_version] = version_counts.get(dep.pkg_version, 0) + 1
+
+        if len(version_counts) > 1:
+            print(f"\n{Colors.YELLOW}Version Distribution:{Colors.END}")
+            for version, count in sorted(version_counts.items(), key=lambda x: x[1], reverse=True):
+                bar_length = int((count / max(version_counts.values())) * 20)
+                bar = "█" * bar_length
+                status = ""
+                if latest and version != latest.latest_version and latest.latest_version != "LOCAL":
+                    if is_breaking_change(version, latest.latest_version):
+                        status = f" {Colors.RED}(outdated - breaking){Colors.END}"
+                    else:
+                        status = f" {Colors.YELLOW}(outdated){Colors.END}"
+                print(f"  {version:10} {Colors.GREEN}{bar}{Colors.END} ({count} repos){status}")
 
 def discover_repositories(force_live=False):
     """Discover repository paths using cache or live discovery

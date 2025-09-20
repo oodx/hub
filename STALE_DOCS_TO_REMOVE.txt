@@ -1,0 +1,22 @@
+STALE DOCUMENTATION FILES TO REMOVE
+====================================
+
+The following documentation files are outdated and should be reviewed for removal:
+
+1. /home/xnull/repos/code/rust/oodx/projects/hub/.session/CONTINUE.md
+   - Appears to be a temporary session file
+   - Should be cleaned up
+
+2. /home/xnull/repos/code/rust/oodx/projects/hub/docs/VERSION_STRAT.md
+   - Old versioning strategy document
+   - May need updating or removal based on current approach
+
+3. /home/xnull/repos/code/rust/oodx/projects/hub/docs/REFACTOR_STRAT.md
+   - Refactoring strategy from earlier phases
+   - Likely obsolete after recent refactoring
+
+4. /home/xnull/repos/code/rust/oodx/projects/hub/docs/HUB_STRAT.md
+   - Old Hub strategy document
+   - Should be reviewed and possibly replaced with current approach
+
+Note: Review these files before deletion to ensure no important information is lost.
