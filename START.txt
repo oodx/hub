@@ -8,12 +8,12 @@ Hub is the **centralized dependency management system** for the entire oodx/RSB
 ecosystem. It eliminates version conflicts, dependency bloat, and upgrade hell
 by providing a single source of truth for external dependencies.
 
-📋 **Single Entry Point**: Read .session/CONTINUE.md for complete context
+📋 **Single Entry Point**: Read docs/procs/PROCESS.txt for complete workflow
 
 🎯 **Quick Start** (5 minutes to productive work):
-1. Read .session/CONTINUE.md ← Master project state & session history (3 min)
-2. Read docs/procs/TASKS.txt ← Current implementation status (1 min)
-3. Run ./bin/repos.py analyze ← Ecosystem dependency analysis (1 min)
+1. Read docs/procs/PROCESS.txt ← Master workflow guide (3 min read)
+2. Read docs/procs/ACHIEVEMENTS.md ← Strategic successes (1 min read)
+3. Run ./bin/repos.py fast --hub-dashboard ← Ecosystem status (1 min read)
 4. Begin work with full context
 
 ⚡ **Ultra-Fast Start** (30 seconds):
@@ -22,18 +22,17 @@ by providing a single source of truth for external dependencies.
 🔍 **System Health Check**:
 → Run ./bin/validate-docs.sh to verify documentation integrity
 
-📁 **Key Process Documents**:
-- .session/CONTINUE.md - Session state & handoff management
-- docs/procs/TASKS.txt - Implementation tracking
-- docs/procs/META_PROCESS.txt - Meta-framework for workflow systems
+📁 **All Process Documents Located in docs/procs/**
+📊 **Reference Documentation in docs/ref/**
+📈 **Strategic Documentation**:
 - docs/HUB_STRAT.md - Core architecture strategy
 - docs/REFACTOR_STRAT.md - Data cache implementation (COMPLETE)
 - docs/VERSION_STRAT.md - Semantic versioning strategy
 
 🔧 **Essential Tools**:
 - ./bin/repos.py - Production dependency analysis (100x+ performance)
-- .eggs/ - Analysis wisdom capture system
-- .uat/ - HORUS LEVEL2 certified testing framework
+- docs/misc/archive/ - Historical analysis and session data
+- bin/validate-docs.sh - Documentation integrity validation
 
 🎨 **Integration Status**:
 - ✅ Boxy UI integration with visual enhancements

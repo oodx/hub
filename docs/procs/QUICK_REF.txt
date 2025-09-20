@@ -27,12 +27,12 @@
   - ./bin/validate-docs.sh (health check)
 
 ⚡ **Immediate Next Steps**:
-1. Read .session/CONTINUE.md for complete session context
+1. Read docs/procs/CONTINUE.md for complete session context
 2. Run ./bin/repos.py hub for integration opportunity analysis
 3. Begin Meteor integration with Cargo.toml feature migration
 
 🚨 **Critical Rules**:
-- **Session Management**: Always update .session/CONTINUE.md on work completion
+- **Session Management**: Always update docs/procs/CONTINUE.md on work completion
 - **Quality Standards**: HORUS LEVEL2 UAT certification maintained
 - **Tool Usage**: Use ./bin/repos.py for all dependency analysis
 - **Documentation**: Keep START.txt and strategy docs current with changes

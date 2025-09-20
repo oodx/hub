@@ -119,7 +119,7 @@ echo "==============================="
 echo "Checking core file structure..."
 
 check_file "START.txt" "single entry point"
-check_file ".session/CONTINUE.md" "session state management"
+check_file "docs/procs/CONTINUE.md" "session state management"
 check_file "docs/procs/TASKS.txt" "implementation tracking"
 check_file "docs/procs/META_PROCESS.txt" "meta-process framework"
 
@@ -141,8 +141,8 @@ check_file "docs/VERSION_STRAT.md" "version strategy document"
 # Analysis and wisdom capture
 echo "Checking analysis systems..."
 
-check_dir ".eggs" "analysis wisdom capture directory"
-check_dir ".session" "session management directory"
+check_dir "docs/misc/archive" "archived analysis and wisdom"
+# .session directory moved to archive as part of Meta Process v2 completion
 
 # Tools and validation
 echo "Checking tools and scripts..."
@@ -154,12 +154,12 @@ check_file "bin/validate-docs.sh" "documentation validation script (this script)
 # Quality assurance
 echo "Checking quality systems..."
 
-check_dir ".uat" "UAT testing directory"
+# UAT certification achieved and documented in ACHIEVEMENTS.md
 
 # Staleness checks (only warn, don't error)
 echo "Checking document freshness..."
 
-check_staleness ".session/CONTINUE.md" 7 "Session state"
+check_staleness "docs/procs/CONTINUE.md" 7 "Session state"
 check_staleness "docs/procs/QUICK_REF.txt" 7 "Quick reference"
 check_staleness "docs/procs/TASKS.txt" 14 "Task tracking"
 check_staleness "docs/HUB_STRAT.md" 30 "Hub strategy"
@@ -168,14 +168,14 @@ check_staleness "docs/HUB_STRAT.md" 30 "Hub strategy"
 echo "Checking reference integrity..."
 
 check_references "START.txt"
-check_references ".session/CONTINUE.md"
+check_references "docs/procs/CONTINUE.md"
 check_references "docs/procs/PROCESS.txt"
 check_references "docs/procs/QUICK_REF.txt"
 
 # Tool reference validation
 echo "Checking tool references..."
 
-check_tool_references ".session/CONTINUE.md"
+check_tool_references "docs/procs/CONTINUE.md"
 check_tool_references "docs/procs/PROCESS.txt"
 check_tool_references "docs/HUB_STRAT.md"
 check_tool_references "docs/REFACTOR_STRAT.md"

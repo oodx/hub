@@ -6,7 +6,7 @@
 
 ## Core Entry Points
 - START.txt - Single entry point (this document's parent)
-- .session/CONTINUE.md - Master session state & handoff management
+- docs/procs/CONTINUE.md - Master session state & handoff management
 - TASKS.txt - Implementation tracking with completion status
 - docs/procs/QUICK_REF.txt - 30-second ultra-fast context
 
@@ -30,7 +30,7 @@
 
 ## Step 1: Context Hydration Checklist
 1. Read START.txt for immediate orientation (30 seconds)
-2. Read .session/CONTINUE.md for complete project state (3 minutes)
+2. Read docs/procs/CONTINUE.md for complete project state (3 minutes)
 3. Review TASKS.txt for current implementation status (1 minute)
 4. Check docs/procs/QUICK_REF.txt for critical context updates
 5. Run ./bin/repos.py analyze for current ecosystem state
@@ -46,11 +46,11 @@
 ## Step 3: Work Execution Patterns
 
 ### Development Session Pattern:
-1. **Context Load**: Read .session/CONTINUE.md current status
+1. **Context Load**: Read docs/procs/CONTINUE.md current status
 2. **Tool Analysis**: Run ./bin/repos.py [analyze|eco|hub] as needed
 3. **Implementation**: Work on current phase tasks from TASKS.txt
 4. **Validation**: Use .uat/ testing framework for quality assurance
-5. **Documentation**: Update session state in .session/CONTINUE.md
+5. **Documentation**: Update session state in docs/procs/CONTINUE.md
 
 ### Integration Session Pattern:
 1. **Dependency Analysis**: ./bin/repos.py hub for integration opportunities
@@ -68,7 +68,7 @@
 
 ## Step 4: Session Closure & Handoff Requirements
 
-### Mandatory Updates to .session/CONTINUE.md:
+### Mandatory Updates to docs/procs/CONTINUE.md:
 - **What was accomplished** - Specific deliverables with file references
 - **Current status** - Project phase and next immediate priorities
 - **Blockers identified** - Dependencies or issues requiring resolution
@@ -135,7 +135,7 @@ cargo check && cargo test
 ```bash
 # Session start
 cat START.txt                    # Quick orientation
-cat .session/CONTINUE.md         # Full context load
+cat docs/procs/CONTINUE.md         # Full context load
 cat docs/procs/QUICK_REF.txt     # Critical updates
 
 # During work
@@ -143,7 +143,7 @@ cat docs/procs/QUICK_REF.txt     # Critical updates
 git status && git diff           # Track changes
 
 # Session end
-vim .session/CONTINUE.md         # Update handoff state
+vim docs/procs/CONTINUE.md         # Update handoff state
 ./bin/validate-docs.sh           # Verify documentation
 git add . && git commit -m "..."  # Preserve work
 ```
@@ -164,7 +164,7 @@ git add . && git commit -m "..."  # Preserve work
 - **Hub Integration Tracking**: Separate analysis prevents self-counting
 
 ## Workflow Rules & Conventions
-- **Session State**: Always update .session/CONTINUE.md with handoff info
+- **Session State**: Always update docs/procs/CONTINUE.md with handoff info
 - **Documentation**: Keep START.txt and QUICK_REF.txt current
 - **Analysis**: Use ./bin/repos.py for all dependency investigation
 - **Quality**: HORUS LEVEL2 standards for UAT certification
@@ -188,7 +188,7 @@ use hub::data::serde_json;
 # REFERENCE LINKS
 
 ## Essential Files (Priority Order)
-1. .session/CONTINUE.md - Complete project state & session history
+1. docs/procs/CONTINUE.md - Complete project state & session history
 2. TASKS.txt - Implementation tracking with completion status
 3. docs/HUB_STRAT.md - Core architecture strategy (598 lines)
 4. docs/REFACTOR_STRAT.md - Data cache implementation (COMPLETE)

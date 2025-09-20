@@ -413,6 +413,22 @@ def get_latest_version(package_name):
     except (urllib.error.URLError, urllib.error.HTTPError, KeyError, json.JSONDecodeError):
         return None
 
+def get_latest_stable_version(package_name):
+    """Get latest stable version from crates.io (excluding pre-releases)"""
+    try:
+        url = f"https://crates.io/api/v1/crates/{package_name}"
+        with urllib.request.urlopen(url, timeout=10) as response:
+            data = json.loads(response.read().decode())
+
+            # Use the max_stable_version field if available, otherwise fallback to max_version
+            return data['crate'].get('max_stable_version') or data['crate']['max_version']
+
+    except KeyboardInterrupt:
+        # Re-raise to let the main handler deal with it
+        raise
+    except (urllib.error.URLError, urllib.error.HTTPError, KeyError, json.JSONDecodeError):
+        return None
+
 def get_parent_repo(cargo_path):
     """Get parent.repo format - parent folder + project name using relative paths"""
     # Use relative path from RUST_REPO_ROOT
@@ -1213,6 +1229,7 @@ class LatestData:
     pkg_id: int
     pkg_name: str
     latest_version: str
+    latest_stable_version: str  # Latest stable version (excluding pre-releases)
     source_type: str  # "crate", "local", "git", "workspace"
     source_value: str  # crates.io version, local path, git repo, or "WORKSPACE"
     hub_version: str  # Hub's version or "NONE"
@@ -1617,6 +1634,7 @@ def batch_fetch_latest_versions(packages_with_sources: Dict[str, Tuple[str, str]
             # Fetch version based on source type
             if source_type == "crate":
                 latest_version = get_latest_version(pkg_name)
+                latest_stable_version = get_latest_stable_version(pkg_name)
             elif source_type == "git":
                 # For git dependencies, extract the repo URL and resolve the version
                 if "#" in source_value:
@@ -1624,13 +1642,17 @@ def batch_fetch_latest_versions(packages_with_sources: Dict[str, Tuple[str, str]
                 else:
                     repo_url, git_ref = source_value, "main"
                 latest_version = resolve_git_version(repo_url, git_ref)
+                latest_stable_version = latest_version  # For git, stable = latest
             elif source_type == "local":
                 # For local dependencies, we'll need to resolve from the local path
                 latest_version = "LOCAL"
+                latest_stable_version = "LOCAL"
             elif source_type == "workspace":
                 latest_version = "WORKSPACE"
+                latest_stable_version = "WORKSPACE"
             else:
                 latest_version = "UNKNOWN"
+                latest_stable_version = "UNKNOWN"
 
             if latest_version or source_type != "crate":
                 # Check if git repos are also available locally
@@ -1665,6 +1687,7 @@ def batch_fetch_latest_versions(packages_with_sources: Dict[str, Tuple[str, str]
                     pkg_id=pkg_id,
                     pkg_name=pkg_name,
                     latest_version=latest_version,
+                    latest_stable_version=latest_stable_version,
                     source_type=source_type,
                     source_value=final_source_value,
                     hub_version=hub_version,
@@ -1810,9 +1833,9 @@ def write_tsv_cache(repos: List[RepoData], deps: List[DepData], latest_versions:
 
         # Section 3: LATEST LIST
         f.write("#------ SECTION : DEP LATEST LIST --------#\n")
-        f.write("PKG_ID\tPKG_NAME\tLATEST_VERSION\tSOURCE_TYPE\tSOURCE_VALUE\tHUB_VERSION\tHUB_STATUS\n")
+        f.write("PKG_ID\tPKG_NAME\tLATEST_VERSION\tLATEST_STABLE_VERSION\tSOURCE_TYPE\tSOURCE_VALUE\tHUB_VERSION\tHUB_STATUS\n")
         for latest in latest_versions.values():
-            f.write(f"{latest.pkg_id}\t{latest.pkg_name}\t{latest.latest_version}\t{latest.source_type}\t{latest.source_value}\t{latest.hub_version}\t{latest.hub_status}\n")
+            f.write(f"{latest.pkg_id}\t{latest.pkg_name}\t{latest.latest_version}\t{latest.latest_stable_version}\t{latest.source_type}\t{latest.source_value}\t{latest.hub_version}\t{latest.hub_status}\n")
         f.write("\n")
 
         # Section 4: VERSION MAP LIST
@@ -1907,15 +1930,16 @@ def hydrate_tsv_cache(cache_file: str = None) -> EcosystemData:
                     )
                     deps[dep.dep_id] = dep
 
-                elif current_section == "latest" and len(parts) >= 7:
+                elif current_section == "latest" and len(parts) >= 8:
                     latest_data = LatestData(
                         pkg_id=int(parts[0]),
                         pkg_name=parts[1],
                         latest_version=parts[2],
-                        source_type=parts[3],
-                        source_value=parts[4],
-                        hub_version=parts[5],
-                        hub_status=parts[6]
+                        latest_stable_version=parts[3],
+                        source_type=parts[4],
+                        source_value=parts[5],
+                        hub_version=parts[6],
+                        hub_status=parts[7]
                     )
                     latest[latest_data.pkg_name] = latest_data
 
@@ -2524,12 +2548,37 @@ def view_hub_dashboard(ecosystem: EcosystemData) -> None:
         usage_count = len([dep for dep in ecosystem.deps.values()
                           if dep.pkg_name == pkg_name and dep.pkg_version not in ['path', 'workspace']])
 
+        # Determine breaking change status using pre-computed stable version
+        breaking_status = "current"
+        if pkg_info.hub_status == 'outdated' and pkg_info.hub_version:
+            # Check if latest version is a pre-release
+            latest_is_prerelease = any(pre in pkg_info.latest_version.lower() for pre in ['alpha', 'beta', 'rc', 'pre', 'dev']) or '-' in pkg_info.latest_version
+
+            if latest_is_prerelease:
+                # Use the pre-computed stable version for assessment
+                if pkg_info.latest_stable_version and pkg_info.latest_stable_version != pkg_info.latest_version:
+                    # Use stable version for breaking change assessment
+                    if is_breaking_change(pkg_info.hub_version, pkg_info.latest_stable_version):
+                        breaking_status = "breaking"
+                    else:
+                        breaking_status = "safe"
+                else:
+                    # No stable version available, mark as unstable
+                    breaking_status = "unstable"
+            else:
+                # Latest is stable, use it for assessment
+                if is_breaking_change(pkg_info.hub_version, pkg_info.latest_version):
+                    breaking_status = "breaking"
+                else:
+                    breaking_status = "safe"
+
         package_data = {
             'name': pkg_name,
             'hub_version': pkg_info.hub_version or "unknown",
-            'latest_version': pkg_info.latest_version,
+            'latest_version': pkg_info.latest_stable_version,
             'usage_count': usage_count,
-            'status': pkg_info.hub_status
+            'status': pkg_info.hub_status,
+            'breaking_status': breaking_status
         }
 
         if pkg_info.hub_status == 'current':
@@ -2542,8 +2591,8 @@ def view_hub_dashboard(ecosystem: EcosystemData) -> None:
     # Current packages section
     if current_packages:
         print(f"\n{Colors.PURPLE}{Colors.BOLD}CURRENT PACKAGES:{Colors.END}")
-        print(f"{Colors.WHITE}Package              Hub Version     Latest          Usage     {Colors.END}")
-        print(f"{Colors.GRAY}------------------------------------------------------------{Colors.END}")
+        print(f"{Colors.WHITE}Package              Hub Version     Latest          #   Safety   {Colors.END}")
+        print(f"{Colors.GRAY}------------------------------------------------------------------{Colors.END}")
 
         for pkg in sorted(current_packages, key=lambda x: x['name']):
             pkg_name = f"{pkg['name']:<20}"
@@ -2557,15 +2606,18 @@ def view_hub_dashboard(ecosystem: EcosystemData) -> None:
                 usage_color = Colors.LIGHT_GRAY
             else:
                 usage_color = Colors.GRAY
-            usage = f"{usage_color}({pkg['usage_count']} projects){Colors.END}"
+            usage = f"{usage_color}{pkg['usage_count']:<3}{Colors.END}"
 
-            print(f"  {Colors.WHITE}{pkg_name} {hub_ver} {latest_ver} {usage}")
+            # Safety status for current packages (always current)
+            safety = f"{Colors.GRAY}current{Colors.END}"
+
+            print(f"  {Colors.WHITE}{pkg_name} {hub_ver} {latest_ver} {usage} {safety}")
 
     # Outdated packages section
     if outdated_packages:
         print(f"\n{Colors.PURPLE}{Colors.BOLD}OUTDATED PACKAGES:{Colors.END}")
-        print(f"{Colors.WHITE}Package              Hub Version     Latest          Usage     {Colors.END}")
-        print(f"{Colors.GRAY}------------------------------------------------------------{Colors.END}")
+        print(f"{Colors.WHITE}Package              Hub Version     Latest          #   Safety   {Colors.END}")
+        print(f"{Colors.GRAY}------------------------------------------------------------------{Colors.END}")
 
         for pkg in sorted(outdated_packages, key=lambda x: -x['usage_count']):
             pkg_name = f"{pkg['name']:<20}"
@@ -2579,9 +2631,19 @@ def view_hub_dashboard(ecosystem: EcosystemData) -> None:
                 usage_color = Colors.LIGHT_GRAY
             else:
                 usage_color = Colors.GRAY
-            usage = f"{usage_color}({pkg['usage_count']} projects){Colors.END}"
+            usage = f"{usage_color}{pkg['usage_count']:<3}{Colors.END}"
 
-            print(f"  {Colors.WHITE}{pkg_name} {hub_ver} {latest_ver} {usage}")
+            # Safety status based on breaking change analysis
+            if pkg['breaking_status'] == 'breaking':
+                safety = f"{Colors.RED}breaking{Colors.END}"
+            elif pkg['breaking_status'] == 'safe':
+                safety = f"{Colors.GREEN}safe{Colors.END}"
+            elif pkg['breaking_status'] == 'unstable':
+                safety = f"{Colors.ORANGE}unstable{Colors.END}"
+            else:
+                safety = f"{Colors.GRAY}unknown{Colors.END}"
+
+            print(f"  {Colors.WHITE}{pkg_name} {hub_ver} {latest_ver} {usage} {safety}")
 
     # Find packages with high usage but not in hub (opportunities)
     # Count usage excluding hub repository (repo_id 103) like legacy
@@ -2651,6 +2713,179 @@ def view_hub_dashboard(ecosystem: EcosystemData) -> None:
                    f"{Colors.RED}■{Colors.END} {Colors.RED}{unused_count}{Colors.END}         "
                    f"{Colors.GRAY}■{Colors.END} {Colors.GRAY}{unique_count}{Colors.END}")
     print(summary_line)
+
+def check_git_safety(repo_path: str) -> tuple[bool, str]:
+    """Check if repo is safe for auto-update (on main branch, clean working directory)"""
+    import subprocess
+    import os
+
+    try:
+        # Change to repo directory
+        original_cwd = os.getcwd()
+        os.chdir(repo_path)
+
+        # Check if it's a git repository
+        result = subprocess.run(['git', 'rev-parse', '--git-dir'],
+                              capture_output=True, text=True, timeout=5)
+        if result.returncode != 0:
+            return False, "Not a git repository"
+
+        # Check current branch
+        result = subprocess.run(['git', 'branch', '--show-current'],
+                              capture_output=True, text=True, timeout=5)
+        if result.returncode != 0:
+            return False, "Could not determine current branch"
+
+        current_branch = result.stdout.strip()
+        if current_branch not in ['main', 'master']:
+            return False, f"Not on main branch (currently on '{current_branch}')"
+
+        # Check for uncommitted changes
+        result = subprocess.run(['git', 'status', '--porcelain'],
+                              capture_output=True, text=True, timeout=5)
+        if result.returncode != 0:
+            return False, "Could not check git status"
+
+        if result.stdout.strip():
+            return False, "Repository has uncommitted changes"
+
+        # Check for unpushed commits
+        result = subprocess.run(['git', 'log', '@{u}..HEAD', '--oneline'],
+                              capture_output=True, text=True, timeout=5)
+        if result.returncode == 0 and result.stdout.strip():
+            return False, "Repository has unpushed commits"
+
+        return True, "Repository is safe for auto-update"
+
+    except subprocess.TimeoutExpired:
+        return False, "Git command timeout"
+    except Exception as e:
+        return False, f"Git check error: {str(e)}"
+    finally:
+        os.chdir(original_cwd)
+
+def update_repo_dependencies(ecosystem: EcosystemData, repo_name: str, dry_run: bool = False) -> None:
+    """Update safe dependencies in a specific repository"""
+    print(f"{Colors.CYAN}{Colors.BOLD}🔄 UPDATING REPOSITORY: {repo_name}{Colors.END}")
+    print(f"{Colors.CYAN}{'='*60}{Colors.END}")
+
+    # Find the repository
+    target_repo = None
+    for repo in ecosystem.repos.values():
+        if repo.repo_name == repo_name:
+            target_repo = repo
+            break
+
+    if not target_repo:
+        print(f"{Colors.RED}❌ Repository '{repo_name}' not found in ecosystem{Colors.END}")
+        return
+
+    # Get full path to repository
+    repo_path = Path(RUST_REPO_ROOT) / target_repo.path
+    repo_dir = repo_path.parent
+
+    print(f"{Colors.CYAN}Repository path: {repo_dir}{Colors.END}")
+
+    if dry_run:
+        print(f"{Colors.YELLOW}🔍 DRY-RUN MODE: Skipping git safety checks{Colors.END}")
+    else:
+        # Check git safety
+        is_safe, safety_message = check_git_safety(str(repo_dir))
+        if not is_safe:
+            print(f"{Colors.RED}❌ Cannot run auto-update: {safety_message}{Colors.END}")
+            print(f"{Colors.YELLOW}💡 To update manually:{Colors.END}")
+            print(f"   1. Ensure you're on main branch: git checkout main")
+            print(f"   2. Commit or stash changes: git status")
+            print(f"   3. Run update again")
+            print(f"{Colors.GRAY}   Or use --dry-run to see what would be updated{Colors.END}")
+            return
+
+        print(f"{Colors.GREEN}✅ Git safety check passed: {safety_message}{Colors.END}")
+
+    # Find dependencies for this repo that have safe updates
+    repo_deps = [dep for dep in ecosystem.deps.values() if dep.repo_id == target_repo.repo_id]
+    safe_updates = []
+
+    for dep in repo_deps:
+        latest_info = ecosystem.latest.get(dep.pkg_name)
+        if latest_info and latest_info.hub_status == 'outdated':
+            # Check if update would be safe (using stable version)
+            if latest_info.latest_stable_version and dep.pkg_version:
+                current_version = dep.pkg_version
+                stable_version = latest_info.latest_stable_version
+
+                # Skip workspace, path, and git dependencies
+                if current_version.startswith(('path:', 'git:', 'workspace:')):
+                    continue
+
+                if not is_breaking_change(current_version, stable_version):
+                    safe_updates.append({
+                        'name': dep.pkg_name,
+                        'current': current_version,
+                        'stable': stable_version,
+                        'dep_type': dep.dep_type
+                    })
+
+    if not safe_updates:
+        print(f"{Colors.YELLOW}✅ No safe dependency updates available for {repo_name}{Colors.END}")
+        return
+
+    print(f"\n{Colors.GREEN}📦 Found {len(safe_updates)} safe updates:{Colors.END}")
+    for update in safe_updates:
+        dep_type_indicator = " (dev)" if update['dep_type'] == 'dev-dep' else ""
+        print(f"  {Colors.BLUE}├─{Colors.END} {update['name']}: {Colors.ORANGE}{update['current']}{Colors.END} → {Colors.GREEN}{update['stable']}{Colors.END}{dep_type_indicator}")
+
+    # Apply updates to Cargo.toml
+    cargo_toml_path = repo_path
+
+    if dry_run:
+        print(f"\n{Colors.YELLOW}🔍 DRY-RUN: Would update {cargo_toml_path}{Colors.END}")
+        print(f"{Colors.YELLOW}✅ Found {len(safe_updates)} safe dependency updates that would be applied{Colors.END}")
+        return
+
+    print(f"\n{Colors.CYAN}🔧 Updating {cargo_toml_path}...{Colors.END}")
+
+    try:
+        # Read current Cargo.toml
+        with open(cargo_toml_path, 'r') as f:
+            content = f.read()
+
+        import re
+        updated_content = content
+        updates_applied = 0
+
+        for update in safe_updates:
+            # Pattern to match dependency lines
+            # Handles both: dependency = "version" and dependency = { version = "version" }
+            patterns = [
+                # Simple version: serde = "1.0.123"
+                rf'^(\s*{re.escape(update["name"])}\s*=\s*")[^"]*(".*)',
+                # Table version: serde = { version = "1.0.123", features = [...] }
+                rf'^(\s*{re.escape(update["name"])}\s*=\s*\{{[^}}]*version\s*=\s*")[^"]*(".*)',
+            ]
+
+            for pattern in patterns:
+                if re.search(pattern, updated_content, re.MULTILINE):
+                    updated_content = re.sub(pattern, rf'\g<1>{update["stable"]}\g<2>',
+                                           updated_content, flags=re.MULTILINE)
+                    updates_applied += 1
+                    break
+
+        if updates_applied > 0:
+            # Write updated content
+            with open(cargo_toml_path, 'w') as f:
+                f.write(updated_content)
+
+            print(f"{Colors.GREEN}✅ Applied {updates_applied} updates to Cargo.toml{Colors.END}")
+            print(f"\n{Colors.YELLOW}📋 Next steps:{Colors.END}")
+            print(f"  1. Test the updates: cd {repo_dir} && cargo check")
+            print(f"  2. Run tests: cargo test")
+            print(f"  3. Commit changes: git add Cargo.toml && git commit -m 'chore: update safe dependencies'")
+        else:
+            print(f"{Colors.YELLOW}⚠️  No dependency patterns matched in Cargo.toml{Colors.END}")
+
+    except Exception as e:
+        print(f"{Colors.RED}❌ Error updating Cargo.toml: {str(e)}{Colors.END}")
 
 def view_review(ecosystem: EcosystemData) -> None:
     """Lightning-fast ecosystem dependency review using hydrated data
@@ -2800,10 +3035,10 @@ def view_review(ecosystem: EcosystemData) -> None:
     print(f"Note: ■ = version conflicts in ecosystem")
     print(f"Versions: Only colored when {Colors.ORANGE}ecosystem{Colors.END} ≠ {Colors.CYAN}latest{Colors.END}")
 
-def view_query(ecosystem: EcosystemData) -> None:
+def view_usage(ecosystem: EcosystemData) -> None:
     """Lightning-fast package usage analysis using hydrated data
 
-    Replaces query command with instant analysis
+    Replaces usage command with instant analysis
     """
     print(f"{Colors.PURPLE}{Colors.BOLD}📊 PACKAGE USAGE ANALYSIS{Colors.END}")
     print(f"{Colors.PURPLE}{'='*80}{Colors.END}\n")
@@ -3932,13 +4167,14 @@ def main():
 
     parser = argparse.ArgumentParser(description="Rust dependency analyzer with enhanced commands")
     parser.add_argument('command', nargs='?', default='conflicts',
-                       choices=['repos', 'conflicts', 'query', 'review', 'hub', 'pkg', 'export', 'data', 'superclean', 'ls', 'legacy',
+                       choices=['repos', 'conflicts', 'usage', 'u', 'q', 'review', 'hub', 'update', 'pkg', 'export', 'data', 'superclean', 'ls', 'legacy',
                                'stats', 'deps', 'outdated', 'search', 'graph'],
                        help='Command to run')
     parser.add_argument('package', nargs='?', help='Package name for pkg/latest/search/graph commands or repo name for deps command')
     parser.add_argument('--ssh-profile', default=None, help='SSH profile/host for git operations (e.g., "qodeninja" for git@qodeninja)')
     parser.add_argument('--live', action='store_true', help='Force live discovery instead of using cache')
     parser.add_argument('--fast-mode', action='store_true', help='Disable progress bars and interactive elements')
+    parser.add_argument('--dry-run', action='store_true', help='Show what would be updated without making changes')
 
     args = parser.parse_args()
 
@@ -3955,7 +4191,7 @@ def main():
         dependencies = analyze_dependencies()
 
         # Fast view commands (primary interface)
-        if args.command in ['conflicts', 'query', 'review', 'hub', 'pkg', 'stats', 'deps', 'outdated', 'search', 'graph']:
+        if args.command in ['conflicts', 'usage', 'u', 'q', 'review', 'hub', 'update', 'pkg', 'stats', 'deps', 'outdated', 'search', 'graph']:
             try:
                 ecosystem = hydrate_tsv_cache()
                 print(f"✅ Hydration successful: {len(ecosystem.deps)} deps, {len(ecosystem.repos)} repos")
@@ -3964,12 +4200,19 @@ def main():
                     view_repos(ecosystem)
                 elif args.command == 'conflicts':
                     view_conflicts(ecosystem)
-                elif args.command == 'query':
-                    view_query(ecosystem)
+                elif args.command in ['usage', 'u', 'q']:
+                    view_usage(ecosystem)
                 elif args.command == 'review':
                     view_review(ecosystem)
                 elif args.command == 'hub':
                     view_hub_dashboard(ecosystem)
+                elif args.command == 'update':
+                    if args.package:
+                        update_repo_dependencies(ecosystem, args.package, dry_run=args.dry_run)
+                    else:
+                        print(f"{Colors.RED}❌ Repository name required for update command{Colors.END}")
+                        print(f"Usage: repos.py update <repo-name> [--dry-run]")
+                        return
                 elif args.command == 'pkg':
                     if args.package:
                         view_package_detail(ecosystem, args.package)
