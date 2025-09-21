@@ -4387,6 +4387,458 @@ def tap_repositories(ssh_profile=None):
     if error_count > 0:
         print(f"   ❌ Errors in {error_count} repositories")
 
+def write_cargo_toml_manually(cargo_path: Path, package_name: str, version: str, domain: str) -> bool:
+    """Manually append a new dependency to Cargo.toml by editing the file directly"""
+    try:
+        with open(cargo_path, 'r') as f:
+            lines = f.readlines()
+
+        # Find the dependencies section
+        dep_section_start = -1
+        dep_section_end = -1
+        in_dependencies = False
+
+        for i, line in enumerate(lines):
+            if line.strip() == '[dependencies]':
+                dep_section_start = i
+                in_dependencies = True
+            elif in_dependencies and line.strip().startswith('['):
+                dep_section_end = i
+                break
+
+        if dep_section_start == -1:
+            print(f"{Colors.RED}❌ Could not find [dependencies] section in Cargo.toml{Colors.END}")
+            return False
+
+        # If no end found, it means dependencies is the last section
+        if dep_section_end == -1:
+            dep_section_end = len(lines)
+
+        # Insert the new dependency before the end of the dependencies section
+        # Find the last non-empty line in dependencies section
+        insert_pos = dep_section_end
+        for i in range(dep_section_end - 1, dep_section_start, -1):
+            if lines[i].strip():
+                insert_pos = i + 1
+                break
+
+        # Create the new dependency line
+        dep_line = f'{package_name} = {{ version = "{version}", optional = true }}\n'
+
+        # Insert the new dependency
+        lines.insert(insert_pos, dep_line)
+
+        # Now update the features section
+        # Find the features section
+        features_start = -1
+        for i, line in enumerate(lines):
+            if line.strip() == '[features]':
+                features_start = i
+                break
+
+        if features_start == -1:
+            print(f"{Colors.RED}❌ Could not find [features] section in Cargo.toml{Colors.END}")
+            return False
+
+        # Find the domain feature line
+        domain_found = False
+        for i in range(features_start + 1, len(lines)):
+            if lines[i].startswith(f'{domain} = '):
+                # Parse the existing array and add our package
+                line = lines[i]
+                # Extract the array content
+                start_idx = line.index('[')
+                end_idx = line.rindex(']')
+                array_content = line[start_idx+1:end_idx]
+
+                # Parse existing items
+                items = []
+                if array_content.strip():
+                    items = [item.strip().strip('"') for item in array_content.split(',')]
+
+                # Add our package if not already there
+                if package_name not in items:
+                    items.append(package_name)
+
+                # Reconstruct the line
+                formatted_items = ', '.join(f'"{item}"' for item in items)
+                lines[i] = f'{domain} = [{formatted_items}]\n'
+                domain_found = True
+                break
+            elif lines[i].strip().startswith('['):
+                # We've reached another section
+                break
+
+        if not domain_found:
+            # Need to add the domain feature
+            # Find where to insert it (after the features line)
+            for i in range(features_start + 1, len(lines)):
+                if lines[i].strip() == '' or lines[i].strip().startswith('['):
+                    lines.insert(i, f'{domain} = ["{package_name}"]\n')
+                    break
+
+        # Add package's own feature if not exists
+        package_feature_line = f'{package_name} = ["dep:{package_name}"]\n'
+        package_feature_found = False
+
+        for i in range(features_start + 1, len(lines)):
+            if lines[i].startswith(f'{package_name} = '):
+                package_feature_found = True
+                break
+            elif lines[i].strip().startswith('['):
+                # Insert before the next section
+                lines.insert(i, package_feature_line)
+                break
+
+        if not package_feature_found and not any(package_feature_line in line for line in lines):
+            # Find the end of features section and add it there
+            for i in range(features_start + 1, len(lines)):
+                if lines[i].strip().startswith('[') or i == len(lines) - 1:
+                    insert_pos = i if lines[i].strip().startswith('[') else i + 1
+                    lines.insert(insert_pos, package_feature_line)
+                    break
+
+        # Write the file back
+        with open(cargo_path, 'w') as f:
+            f.writelines(lines)
+
+        return True
+
+    except Exception as e:
+        print(f"{Colors.RED}❌ Error manually editing Cargo.toml: {e}{Colors.END}")
+        return False
+
+def learn_package(ecosystem: EcosystemData, package_name: str) -> bool:
+    """Learn a package by adding it to hub's Cargo.toml with its latest version"""
+
+    # Skip RSB package
+    if package_name.lower() == 'rsb':
+        print(f"{Colors.YELLOW}⚠️  Cannot learn 'rsb' package (circular dependency){Colors.END}")
+        return False
+
+    # Check if package exists in ecosystem
+    if package_name not in ecosystem.latest:
+        print(f"{Colors.RED}❌ Package '{package_name}' not found in ecosystem{Colors.END}")
+        return False
+
+    pkg_info = ecosystem.latest[package_name]
+
+    # Check if already in hub
+    if pkg_info.hub_status in ['current', 'outdated']:
+        print(f"{Colors.YELLOW}⚠️  Package '{package_name}' already in hub (status: {pkg_info.hub_status}){Colors.END}")
+        return False
+
+    # Get the latest stable version
+    latest_version = pkg_info.latest_stable_version or pkg_info.latest_version
+
+    # Load hub's Cargo.toml path
+    hub_cargo_path = Path(RUST_REPO_ROOT) / "oodx" / "projects" / "hub" / "Cargo.toml"
+
+    # Determine which domain feature group this package belongs to
+    domain = categorize_package(package_name)
+
+    # Try to use toml library first, fallback to manual editing
+    try:
+        import toml
+        cargo_data = load_toml(hub_cargo_path)
+
+        # Ensure dependencies section exists
+        if 'dependencies' not in cargo_data:
+            cargo_data['dependencies'] = {}
+
+        # Add the package with optional = true (for feature gating)
+        cargo_data['dependencies'][package_name] = {
+            'version': latest_version,
+            'optional': True
+        }
+
+        # Update features section to include this package
+        if 'features' not in cargo_data:
+            cargo_data['features'] = {}
+
+        # Add to domain feature group
+        if domain not in cargo_data['features']:
+            cargo_data['features'][domain] = []
+
+        if package_name not in cargo_data['features'][domain]:
+            cargo_data['features'][domain].append(package_name)
+
+        # Also ensure package has its own feature
+        if package_name not in cargo_data['features']:
+            cargo_data['features'][package_name] = [f"dep:{package_name}"]
+
+        # Write back the updated Cargo.toml
+        with open(hub_cargo_path, 'w') as f:
+            toml.dump(cargo_data, f)
+
+        print(f"{Colors.GREEN}✅ Learned '{package_name}' v{latest_version} → {domain} domain{Colors.END}")
+        return True
+
+    except ImportError:
+        # Fallback to manual editing
+        print(f"{Colors.YELLOW}⚠️  toml library not available, using manual editing{Colors.END}")
+        if write_cargo_toml_manually(hub_cargo_path, package_name, latest_version, domain):
+            print(f"{Colors.GREEN}✅ Learned '{package_name}' v{latest_version} → {domain} domain{Colors.END}")
+            return True
+        else:
+            return False
+
+    except Exception as e:
+        print(f"{Colors.RED}❌ Failed to update hub's Cargo.toml: {e}{Colors.END}")
+        return False
+
+def categorize_package(package_name: str) -> str:
+    """Categorize package into a domain based on its name/purpose"""
+    # Common categorization patterns
+    text_packages = ['regex', 'unicode', 'string', 'text', 'markdown', 'html']
+    data_packages = ['serde', 'json', 'toml', 'yaml', 'csv', 'xml', 'bincode']
+    time_packages = ['chrono', 'time', 'date', 'duration', 'timer']
+    web_packages = ['http', 'url', 'reqwest', 'hyper', 'actix', 'warp', 'rocket', 'tower']
+    system_packages = ['libc', 'nix', 'winapi', 'os', 'env', 'process', 'fs']
+    dev_packages = ['log', 'tracing', 'env_logger', 'pretty', 'debug', 'test']
+    random_packages = ['rand', 'uuid', 'nanoid', 'random']
+
+    name_lower = package_name.lower()
+
+    # Check each category
+    for keyword in text_packages:
+        if keyword in name_lower:
+            return 'text'
+
+    for keyword in data_packages:
+        if keyword in name_lower:
+            return 'data'
+
+    for keyword in time_packages:
+        if keyword in name_lower:
+            return 'time'
+
+    for keyword in web_packages:
+        if keyword in name_lower:
+            return 'web'
+
+    for keyword in system_packages:
+        if keyword in name_lower:
+            return 'system'
+
+    for keyword in dev_packages:
+        if keyword in name_lower:
+            return 'dev'
+
+    for keyword in random_packages:
+        if keyword in name_lower:
+            return 'random'
+
+    # Default to 'common' for uncategorized packages
+    return 'common'
+
+def add_hub_metadata_section(cargo_path: Path, repo_name: str) -> bool:
+    """Add [package.metadata.hub] section to a Cargo.toml file"""
+    try:
+        with open(cargo_path, 'r') as f:
+            lines = f.readlines()
+
+        # Check if the section already exists
+        for line in lines:
+            if '[package.metadata.hub]' in line:
+                print(f"{Colors.YELLOW}⚠️  [package.metadata.hub] section already exists{Colors.END}")
+                return False
+
+        # Find where to insert the metadata section
+        # Look for [package.metadata] first, or [package] section
+        package_metadata_idx = -1
+        package_idx = -1
+
+        for i, line in enumerate(lines):
+            if line.strip() == '[package.metadata]':
+                package_metadata_idx = i
+            elif line.strip() == '[package]':
+                package_idx = i
+
+        # Prepare the hub metadata section
+        hub_section = [
+            '\n',
+            '[package.metadata.hub]\n',
+            f'notes = "Hub metadata for {repo_name} repository"\n',
+            'hub_sync = "true"  # Set to "false" to skip this repo in hub updates\n',
+            '# priority = "medium"  # Options: high, medium, low\n',
+            '# Add any custom fields below\n'
+        ]
+
+        # Insert the section at the appropriate location
+        insert_idx = -1
+
+        if package_idx != -1:
+            # Find the end of the [package] section
+            insert_idx = package_idx + 1
+            while insert_idx < len(lines) and not lines[insert_idx].strip().startswith('['):
+                insert_idx += 1
+
+            # Insert before the next section
+            for section_line in hub_section:
+                lines.insert(insert_idx, section_line)
+                insert_idx += 1
+        else:
+            # If no [package] section found, append at the end
+            lines.extend(hub_section)
+
+        # Write the file back
+        with open(cargo_path, 'w') as f:
+            f.writelines(lines)
+
+        return True
+
+    except Exception as e:
+        print(f"{Colors.RED}❌ Error adding hub metadata section: {e}{Colors.END}")
+        return False
+
+def view_repo_notes(ecosystem: EcosystemData, repo_name: str, create_if_missing: bool = False) -> None:
+    """Display hub annotations/notes for a specific repository, optionally creating the section if missing"""
+
+    # Find the repository
+    repo_found = None
+    for repo in ecosystem.repos.values():
+        if repo.repo_name.lower() == repo_name.lower():
+            repo_found = repo
+            break
+
+    if not repo_found:
+        print(f"{Colors.RED}❌ Repository '{repo_name}' not found{Colors.END}")
+        print(f"\nAvailable repositories:")
+        for repo in sorted(ecosystem.repos.values(), key=lambda r: r.repo_name):
+            print(f"  • {repo.repo_name}")
+        return
+
+    # Load the Cargo.toml to get fresh metadata
+    # Note: repo_found.path already includes "Cargo.toml"
+    cargo_path = Path(RUST_REPO_ROOT) / repo_found.path
+
+    try:
+        cargo_data = load_toml(cargo_path)
+        hub_meta = cargo_data.get('package', {}).get('metadata', {}).get('hub', {})
+
+        print(f"{Colors.PURPLE}{Colors.BOLD}📝 HUB NOTES: {repo_found.repo_name}{Colors.END}")
+        print(f"{Colors.PURPLE}{'='*80}{Colors.END}\n")
+
+        if not hub_meta:
+            if create_if_missing:
+                # Create the metadata section
+                print(f"{Colors.CYAN}📝 Creating hub metadata section for {repo_found.repo_name}...{Colors.END}")
+
+                # Add the section to the Cargo.toml file
+                if add_hub_metadata_section(cargo_path, repo_found.repo_name):
+                    print(f"{Colors.GREEN}✅ Added [package.metadata.hub] section to {repo_found.repo_name}'s Cargo.toml{Colors.END}")
+                    print(f"\n{Colors.CYAN}You can now edit the following fields:{Colors.END}")
+                    print(f"  • notes - Description and notes about the repository")
+                    print(f"  • hub_sync - Set to 'false' to skip in hub updates")
+                    print(f"  • priority - Set to 'high', 'medium', or 'low'")
+                    print(f"  • Add any custom fields as needed")
+                else:
+                    print(f"{Colors.RED}❌ Failed to add metadata section{Colors.END}")
+            else:
+                print(f"{Colors.GRAY}No hub metadata found for {repo_found.repo_name}{Colors.END}")
+                print(f"\n{Colors.CYAN}💡 To add notes automatically, run:{Colors.END}")
+                print(f"{Colors.WHITE}  repos.py notes {repo_found.repo_name} --create{Colors.END}")
+                print(f"\n{Colors.CYAN}Or manually add this to {repo_found.repo_name}'s Cargo.toml:{Colors.END}")
+                print(f"{Colors.GRAY}[package.metadata.hub]{Colors.END}")
+                print(f'{Colors.GRAY}notes = "Your notes about this repo"{Colors.END}')
+                print(f'{Colors.GRAY}hub_sync = "true"  # or "false" to skip in updates{Colors.END}')
+                print(f'{Colors.GRAY}priority = "high"   # or "medium", "low"{Colors.END}')
+            return
+
+        # Display all hub metadata
+        print(f"{Colors.WHITE}Repository: {Colors.CYAN}{repo_found.repo_name}{Colors.END}")
+        print(f"{Colors.WHITE}Path: {Colors.GRAY}{repo_found.path}{Colors.END}")
+        print(f"{Colors.WHITE}Version: {Colors.GRAY}{repo_found.cargo_version}{Colors.END}")
+        print()
+
+        # Display each metadata field
+        for key, value in hub_meta.items():
+            if key == 'notes':
+                print(f"{Colors.WHITE}{Colors.BOLD}Notes:{Colors.END}")
+                # Handle multiline notes
+                if isinstance(value, str):
+                    for line in value.split('\n'):
+                        print(f"  {Colors.WHITE}{line}{Colors.END}")
+                else:
+                    print(f"  {Colors.WHITE}{value}{Colors.END}")
+            elif key == 'hub_sync':
+                status_color = Colors.GREEN if value != "false" else Colors.YELLOW
+                print(f"{Colors.WHITE}Hub Sync: {status_color}{value}{Colors.END}")
+            elif key == 'priority':
+                priority_colors = {
+                    'high': Colors.RED,
+                    'medium': Colors.YELLOW,
+                    'low': Colors.GRAY
+                }
+                color = priority_colors.get(value.lower(), Colors.WHITE)
+                print(f"{Colors.WHITE}Priority: {color}{value}{Colors.END}")
+            else:
+                # Display any other custom fields
+                print(f"{Colors.WHITE}{key.title()}: {Colors.CYAN}{value}{Colors.END}")
+
+    except Exception as e:
+        print(f"{Colors.RED}❌ Error reading metadata from {cargo_path}: {e}{Colors.END}")
+
+def learn_all_opportunities(ecosystem: EcosystemData) -> int:
+    """Learn all package opportunities from hub analysis"""
+
+    print(f"{Colors.PURPLE}{Colors.BOLD}🎓 LEARNING HUB OPPORTUNITIES{Colors.END}")
+    print(f"{Colors.PURPLE}{'='*80}{Colors.END}\n")
+
+    # Get packages that are actually IN the hub (current or outdated, not gap)
+    actual_hub_packages = {name for name, info in ecosystem.latest.items()
+                          if info.hub_status in ['current', 'outdated']}
+
+    # Count usage excluding hub repository (repo_id 103)
+    all_packages = {}
+    for dep in ecosystem.deps.values():
+        # Skip dependencies from hub repository
+        if dep.repo_id == 103:
+            continue
+        # Skip path and workspace dependencies
+        if dep.pkg_version in ['path', 'workspace']:
+            continue
+
+        pkg_name = dep.pkg_name
+        if pkg_name not in all_packages:
+            all_packages[pkg_name] = set()
+        all_packages[pkg_name].add(dep.repo_id)
+
+    # Convert to usage counts
+    package_usage = {pkg: len(repos) for pkg, repos in all_packages.items()}
+
+    # Find opportunities (5+ usage, not in hub, not rsb)
+    opportunities = []
+    for pkg_name, usage_count in package_usage.items():
+        if usage_count >= 5 and pkg_name not in actual_hub_packages and pkg_name.lower() != 'rsb':
+            opportunities.append((pkg_name, usage_count))
+
+    if not opportunities:
+        print(f"{Colors.YELLOW}⚠️  No package opportunities found (5+ usage, not in hub){Colors.END}")
+        return 0
+
+    # Sort by usage count
+    opportunities.sort(key=lambda x: -x[1])
+
+    print(f"Found {len(opportunities)} packages to learn:\n")
+    for pkg_name, count in opportunities:
+        print(f"  • {pkg_name} (used by {count} repos)")
+
+    print(f"\n{Colors.CYAN}Learning packages...{Colors.END}\n")
+
+    learned_count = 0
+    for pkg_name, _ in opportunities:
+        if learn_package(ecosystem, pkg_name):
+            learned_count += 1
+
+    print(f"\n{Colors.GREEN}✅ Successfully learned {learned_count}/{len(opportunities)} packages{Colors.END}")
+
+    if learned_count > 0:
+        print(f"\n{Colors.CYAN}ℹ️  Remember to run 'cargo check' to verify the additions{Colors.END}")
+
+    return learned_count
+
 def main():
     def signal_handler(signum, frame):
         """Global signal handler for graceful exit"""
@@ -4411,14 +4863,15 @@ def main():
     parser = argparse.ArgumentParser(description="Rust dependency analyzer with enhanced commands")
     parser.add_argument('command', nargs='?', default='conflicts',
                        choices=['repos', 'conflicts', 'usage', 'u', 'q', 'review', 'hub', 'update', 'eco', 'pkg', 'export', 'data', 'superclean', 'ls', 'legacy',
-                               'stats', 'deps', 'outdated', 'search', 'graph'],
+                               'stats', 'deps', 'outdated', 'search', 'graph', 'learn', 'notes'],
                        help='Command to run')
-    parser.add_argument('package', nargs='?', help='Package name for pkg/latest/search/graph commands or repo name for deps command')
+    parser.add_argument('package', nargs='?', help='Package/repo name for pkg/latest/search/graph/learn/notes commands or "all" for learn all')
     parser.add_argument('--ssh-profile', default=None, help='SSH profile/host for git operations (e.g., "qodeninja" for git@qodeninja)')
     parser.add_argument('--live', action='store_true', help='Force live discovery instead of using cache')
     parser.add_argument('--fast-mode', action='store_true', help='Disable progress bars and interactive elements')
     parser.add_argument('--dry-run', action='store_true', help='Show what would be updated without making changes')
     parser.add_argument('--force-commit', action='store_true', help='Automatically commit changes with auto:hub bump message')
+    parser.add_argument('--create', action='store_true', help='Create hub metadata section if it doesn\'t exist (for notes command)')
 
     args = parser.parse_args()
 
@@ -4435,7 +4888,7 @@ def main():
         dependencies = analyze_dependencies()
 
         # Fast view commands (primary interface)
-        if args.command in ['conflicts', 'usage', 'u', 'q', 'review', 'hub', 'update', 'eco', 'pkg', 'stats', 'deps', 'outdated', 'search', 'graph']:
+        if args.command in ['conflicts', 'usage', 'u', 'q', 'review', 'hub', 'update', 'eco', 'pkg', 'stats', 'deps', 'outdated', 'search', 'graph', 'learn', 'notes']:
             try:
                 ecosystem = hydrate_tsv_cache()
                 print(f"✅ Hydration successful: {len(ecosystem.deps)} deps, {len(ecosystem.repos)} repos")
@@ -4490,6 +4943,25 @@ def main():
                     else:
                         print(f"{Colors.RED}❌ Package name required for graph command{Colors.END}")
                         print(f"Usage: repos.py graph <package-name>")
+                        return
+                elif args.command == 'learn':
+                    if args.package:
+                        if args.package.lower() == 'all':
+                            learn_all_opportunities(ecosystem)
+                        else:
+                            learn_package(ecosystem, args.package)
+                    else:
+                        print(f"{Colors.RED}❌ Package name or 'all' required for learn command{Colors.END}")
+                        print(f"Usage: repos.py learn <package-name>  # Learn a specific package")
+                        print(f"       repos.py learn all              # Learn all opportunities")
+                        return
+                elif args.command == 'notes':
+                    if args.package:
+                        view_repo_notes(ecosystem, args.package, create_if_missing=args.create)
+                    else:
+                        print(f"{Colors.RED}❌ Repository name required for notes command{Colors.END}")
+                        print(f"Usage: repos.py notes <repo-name>           # View hub metadata/notes")
+                        print(f"       repos.py notes <repo-name> --create  # Create metadata section if missing")
                         return
             except Exception as e:
                 print(f"❌ Error in {args.command} command: {e}")
