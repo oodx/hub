@@ -6,9 +6,18 @@ Hub is a centralized dependency management system for the oodx/RSB ecosystem tha
 ## Quick Integration
 
 ### 1. Add Hub to Your Project
+
+#### Primary Method: GitHub Repository (Recommended)
 ```toml
 # Cargo.toml
 [dependencies]
+hub = { git = "https://github.com/oodx/hub.git", features = ["regex", "serde"] }
+```
+
+#### Secondary Method: Local Path (Emergency/Hot-fixes Only)
+⚠️ **Use only when you have urgent local fixes that cannot wait for hub to publish**
+```toml
+# Cargo.toml - FOR EMERGENCY USE ONLY
 hub = { path = "../../hub", features = ["regex", "serde"] }
 ```
 
@@ -61,26 +70,49 @@ Hub follows strict semantic versioning:
 - **Major version bump**: When any dependency has a major version change
 - This ensures downstream projects can trust semantic versioning for updates
 
+## Integration Methods
+
+### When to Use Each Method
+
+#### GitHub Repository (Primary - Recommended)
+✅ **Use for all standard development**
+- Ensures you get the latest stable version
+- Maintained and tested hub distribution
+- Consistent with other projects in the ecosystem
+- Proper semantic versioning
+
+#### Local Path (Secondary - Emergency Only)
+⚠️ **Use only when:**
+- You have urgent hot-fixes that cannot wait for hub publishing
+- You are actively developing hub features for testing
+- You need immediate access to unpublished changes
+
+⚠️ **Warnings for local path usage:**
+- May introduce version inconsistencies across projects
+- Requires manual coordination with hub updates
+- Not suitable for production deployments
+- Should be temporary - migrate to GitHub repo when fixes are published
+
 ## Integration Examples
 
 ### Basic Project Setup
 ```toml
 [dependencies]
-hub = { path = "../../hub", features = ["core"] }
+hub = { git = "https://github.com/oodx/hub.git", features = ["core"] }
 # Gets you: regex, lazy_static, unicode-width, serde, serde_json, base64, chrono, uuid
 ```
 
 ### Web Service Project
 ```toml
 [dependencies]
-hub = { path = "../../hub", features = ["extended", "random"] }
+hub = { git = "https://github.com/oodx/hub.git", features = ["extended", "random"] }
 # Gets you: core + web + system + random capabilities
 ```
 
 ### Development Tools Project
 ```toml
 [dependencies]
-hub = { path = "../../hub", features = ["common", "dev"] }
+hub = { git = "https://github.com/oodx/hub.git", features = ["common", "dev"] }
 # Gets you: common features + portable-pty for terminal tools
 ```
 
@@ -101,11 +133,15 @@ hub = { path = "../../hub", features = ["common", "dev"] }
 ## Migration Checklist
 
 1. **Remove direct dependencies** from your Cargo.toml
-2. **Add hub dependency** with appropriate features
+2. **Add hub dependency** using GitHub repo with appropriate features:
+   ```toml
+   hub = { git = "https://github.com/oodx/hub.git", features = ["your-features"] }
+   ```
 3. **Update imports** to use hub re-exports
 4. **Test compilation** with `cargo check`
 5. **Run tests** to ensure compatibility
 6. **Update documentation** if needed
+7. **Avoid local paths** unless you have urgent hot-fixes that cannot wait for publishing
 
 ## Common Patterns
 
@@ -162,6 +198,11 @@ fn extract_numbers(text: &str) -> Vec<String> {
 ### Performance Issues
 - Use specific features instead of "all" to reduce compilation time
 - Consider using domain groups for better organization
+
+### Path Configuration Issues
+- **Always prefer GitHub repo**: Use `git = "https://github.com/oodx/hub.git"` for standard development
+- **Local paths are temporary**: If using `path = "../../hub"`, plan to migrate to GitHub repo when fixes are published
+- **Version conflicts**: Local paths may cause inconsistencies between projects using different hub versions
 
 ## Support
 
