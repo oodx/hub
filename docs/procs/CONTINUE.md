@@ -1,5 +1,55 @@
 # Continue Log – main + meta-process-complete
 
+## HANDOFF-2025-09-21-[CURRENT]
+### Session Duration: 2 hours
+### Branch: main
+### Completed:
+- Implemented `learn` command for hub dependency acquisition
+  - Single package learning: `./bin/repos.py learn <package>`
+  - Batch learning: `./bin/repos.py learn all`
+  - Smart domain categorization (text, data, time, web, system, dev, random)
+  - Manual TOML editing fallback when toml library unavailable
+  - Successfully learned 4 packages: unicode-width, criterion, thiserror, tempfile
+- Implemented `notes` command for hub metadata management
+  - View metadata: `./bin/repos.py notes <repo>`
+  - Create metadata: `./bin/repos.py notes <repo> --create`
+  - Added [package.metadata.hub] section to boxy repository
+- Updated serde to version 1.0.226
+- Hub now has 16 current packages (increased from 12)
+- Committed changes: b162a9f
+
+### Current Status:
+- Hub package count: 16 current, 0 outdated, 1 gap (rsb - intentionally excluded)
+- TSV cache regenerated with new packages
+- Both commands fully integrated with existing cache system
+- Ready for Meteor integration phase
+
+### Blockers:
+- None identified
+
+### Next Agent MUST:
+1. Read START.txt for orientation
+2. Review this CONTINUE.md for current state
+3. Check `./bin/repos.py hub` for current package status
+4. Begin Meteor integration:
+   - Update Meteor's Cargo.toml to use hub
+   - Replace direct dependencies with hub imports
+   - Test functionality preservation
+
+### Context Preservation:
+- `learn` command intelligently skips already-learned packages via hub_status check
+- `learn all` excludes RSB to prevent circular dependencies
+- `notes --create` adds well-formatted metadata section with comments
+- Hub metadata enables per-repo configuration (hub_sync, priority, notes)
+- Package categorization uses keyword matching for domain assignment
+- Manual TOML editing implemented as fallback (write_cargo_toml_manually, add_hub_metadata_section)
+
+### Files Modified:
+- bin/repos.py - Added learn_package(), learn_all_opportunities(), view_repo_notes(), add_hub_metadata_section()
+- Cargo.toml - Added unicode-width, criterion, thiserror, tempfile
+- Cargo.lock - Updated with new dependencies
+- /home/xnull/repos/code/rust/oodx/projects/boxy/Cargo.toml - Added hub metadata section
+
 ## HANDOFF-2025-09-20-1600
 ### Session Duration: 2 hours
 ### Branch: main
