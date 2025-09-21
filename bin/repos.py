@@ -2847,7 +2847,7 @@ def auto_commit_changes(repo_dir: str, updates_count: int) -> tuple[bool, str]:
     finally:
         os.chdir(original_cwd)
 
-def update_repo_dependencies(ecosystem: EcosystemData, repo_name: str, dry_run: bool = False, force_commit: bool = False) -> None:
+def update_repo_dependencies(ecosystem: EcosystemData, repo_name: str, dry_run: bool = False, force_commit: bool = False, force: bool = False) -> None:
     """Update safe dependencies in a specific repository"""
     print(f"{Colors.CYAN}{Colors.BOLD}🔄 UPDATING REPOSITORY: {repo_name}{Colors.END}")
     print(f"{Colors.CYAN}{'='*60}{Colors.END}")
@@ -2871,6 +2871,9 @@ def update_repo_dependencies(ecosystem: EcosystemData, repo_name: str, dry_run: 
 
     if dry_run:
         print(f"{Colors.YELLOW}🔍 DRY-RUN MODE: Skipping git safety checks{Colors.END}")
+    elif force:
+        print(f"{Colors.YELLOW}⚠️  FORCE MODE: Skipping git safety checks{Colors.END}")
+        print(f"{Colors.YELLOW}    Updates will proceed regardless of branch or uncommitted changes{Colors.END}")
     else:
         # Check git safety
         is_safe, safety_message = check_git_safety(str(repo_dir))
@@ -2881,6 +2884,7 @@ def update_repo_dependencies(ecosystem: EcosystemData, repo_name: str, dry_run: 
             print(f"   2. Commit or stash changes: git status")
             print(f"   3. Run update again")
             print(f"{Colors.GRAY}   Or use --dry-run to see what would be updated{Colors.END}")
+            print(f"{Colors.GRAY}   Or use --force to bypass safety checks{Colors.END}")
             return
 
         print(f"{Colors.GREEN}✅ Git safety check passed: {safety_message}{Colors.END}")
@@ -2980,7 +2984,7 @@ def update_repo_dependencies(ecosystem: EcosystemData, repo_name: str, dry_run: 
     except Exception as e:
         print(f"{Colors.RED}❌ Error updating Cargo.toml: {str(e)}{Colors.END}")
 
-def update_ecosystem(ecosystem: EcosystemData, dry_run: bool = False, force_commit: bool = False) -> None:
+def update_ecosystem(ecosystem: EcosystemData, dry_run: bool = False, force_commit: bool = False, force: bool = False) -> None:
     """Update safe dependencies across all repositories in the ecosystem (except hub and rsb)"""
     print(f"{Colors.CYAN}{Colors.BOLD}🌍 ECOSYSTEM-WIDE UPDATE{Colors.END}")
     print(f"{Colors.CYAN}{'='*60}{Colors.END}")
@@ -3000,6 +3004,8 @@ def update_ecosystem(ecosystem: EcosystemData, dry_run: bool = False, force_comm
 
     if dry_run:
         print(f"\n{Colors.YELLOW}🔍 DRY-RUN MODE: Analyzing potential updates...{Colors.END}")
+    elif force:
+        print(f"\n{Colors.YELLOW}⚠️  FORCE MODE: Starting ecosystem update without git safety checks...{Colors.END}")
     else:
         print(f"\n{Colors.CYAN}🚀 Starting ecosystem update...{Colors.END}")
 
@@ -3016,8 +3022,8 @@ def update_ecosystem(ecosystem: EcosystemData, dry_run: bool = False, force_comm
         repo_path = Path(RUST_REPO_ROOT) / repo.path
         repo_dir = repo_path.parent
 
-        # Check git safety (unless dry-run)
-        if not dry_run:
+        # Check git safety (unless dry-run or force)
+        if not dry_run and not force:
             is_safe, safety_message = check_git_safety(str(repo_dir))
             if not is_safe:
                 print(f"  {Colors.RED}❌ Skipped: {safety_message}{Colors.END}")
@@ -4897,6 +4903,7 @@ def main():
     parser.add_argument('--fast-mode', action='store_true', help='Disable progress bars and interactive elements')
     parser.add_argument('--dry-run', action='store_true', help='Show what would be updated without making changes')
     parser.add_argument('--force-commit', action='store_true', help='Automatically commit changes with auto:hub bump message')
+    parser.add_argument('--force', action='store_true', help='Force operation even if not on main branch or with uncommitted changes')
     parser.add_argument('--create', action='store_true', help='Create hub metadata section if it doesn\'t exist (for notes command)')
 
     args = parser.parse_args()
@@ -4931,13 +4938,13 @@ def main():
                     view_hub_dashboard(ecosystem)
                 elif args.command == 'update':
                     if args.package:
-                        update_repo_dependencies(ecosystem, args.package, dry_run=args.dry_run, force_commit=args.force_commit)
+                        update_repo_dependencies(ecosystem, args.package, dry_run=args.dry_run, force_commit=args.force_commit, force=args.force)
                     else:
                         print(f"{Colors.RED}❌ Repository name required for update command{Colors.END}")
-                        print(f"Usage: repos.py update <repo-name> [--dry-run] [--force-commit]")
+                        print(f"Usage: repos.py update <repo-name> [--dry-run] [--force-commit] [--force]")
                         return
                 elif args.command == 'eco':
-                    update_ecosystem(ecosystem, dry_run=args.dry_run, force_commit=args.force_commit)
+                    update_ecosystem(ecosystem, dry_run=args.dry_run, force_commit=args.force_commit, force=args.force)
                 elif args.command == 'pkg':
                     if args.package:
                         view_package_detail(ecosystem, args.package)
