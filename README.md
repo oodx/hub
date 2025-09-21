@@ -22,6 +22,126 @@ use hub::serde;      // Instead of: use serde;
 use hub::prelude::*;
 ```
 
+## Hub Integration Model & Philosophy
+
+### The Hub Approach
+Hub serves as the **central dependency coordinator** for the oodx/RSB ecosystem, implementing a feature-flag based modular system that prevents version conflicts while enabling precise dependency control.
+
+#### Core Principles
+- **Feature-first design**: Projects specify what they need, not how to get it
+- **Version harmony**: Single source of truth for all dependency versions
+- **Modular inclusion**: Only include features you actually use
+- **Semantic versioning propagation**: Hub versions reflect dependency chain changes
+
+### Usage-Based Inclusion Criteria
+
+Hub follows a data-driven approach to dependency inclusion:
+
+- **3+ project usage**: Dependencies used by 3 or more projects are eligible for hub inclusion
+  - Requires manual review and consideration
+  - Evaluated for ecosystem benefit and maintenance impact
+
+- **5+ project usage**: Dependencies used by 5 or more projects get automatic inclusion
+  - Handled automatically by blade tools
+  - Reflects proven ecosystem value and widespread need
+
+- **Strategic dependencies**: Core infrastructure dependencies may be included regardless of usage count
+
+### Hub Versioning Strategy
+
+Hub implements **semantic versioning propagation** to ensure reliable downstream dependency management:
+
+#### Version Bump Rules
+- **Minor version update**: When any hub dependency receives a minor version update
+- **Major version update**: When any hub dependency receives a major version update
+- **Patch version update**: For hub-specific fixes that don't affect dependencies
+
+This strategy ensures that:
+- Downstream projects can trust semantic versioning for safe updates
+- Breaking changes in dependencies are properly communicated through hub's major version
+- Projects can confidently update to newer hub minor versions
+- The ecosystem maintains version harmony
+
+#### Example Version Flow
+```
+tokio 1.35.0 → 1.36.0  ===> hub 0.3.0 → 0.4.0 (minor bump)
+serde 1.0.0 → 2.0.0    ===> hub 0.4.0 → 1.0.0 (major bump)
+hub fixes only         ===> hub 1.0.0 → 1.0.1 (patch bump)
+```
+
+### Feature Flag System
+
+Hub's feature system provides granular control over dependencies:
+
+#### Individual Features
+```toml
+[dependencies]
+hub = { features = ["regex", "serde", "chrono"] }
+```
+
+#### Domain-Based Features
+- **`text`**: Text processing (regex, lazy_static, unicode-width)
+- **`data`**: Serialization (serde, serde_json, base64)
+- **`time`**: Date/time handling (chrono, uuid)
+- **`web`**: Web utilities (urlencoding)
+- **`system`**: System access (libc, glob)
+- **`random`**: Random generation (rand)
+- **`dev`**: Development tools (portable-pty)
+
+#### Convenience Groups
+- **`common`**: Most frequently used features (text + data + dev tools)
+- **`core`**: Essential features (text + data + time)
+- **`extended`**: Comprehensive set (core + web + system)
+- **`all`**: Everything (use with caution)
+
+### Integration Benefits
+
+#### For Projects
+- **Zero version conflicts**: Guaranteed compatibility across the ecosystem
+- **Simplified maintenance**: No external dependency version management
+- **Faster builds**: Cargo efficiently deduplicates shared dependencies
+- **Coordinated updates**: Ecosystem-wide version coordination
+- **Cleaner manifests**: Focus on features, not versions
+
+#### For the Ecosystem
+- **Centralized security**: Single point for vulnerability scanning
+- **Consistent behavior**: Same dependency versions everywhere
+- **Reduced complexity**: Unified dependency management
+- **Strategic optimization**: Data-driven inclusion decisions
+
+### Migration Path
+
+Moving from direct dependencies to hub integration:
+
+```toml
+# Before: Direct dependencies
+[dependencies]
+regex = "1.10.2"
+serde = { version = "1.0", features = ["derive"] }
+chrono = "0.4.42"
+
+# After: Hub integration
+[dependencies]
+hub = { path = "../../hub", features = ["core"] }
+```
+
+```rust
+// Update imports
+use regex::Regex;                    // Before
+use hub::regex::Regex;               // After
+
+use serde::{Serialize, Deserialize}; // Before
+use hub::serde::{Serialize, Deserialize}; // After
+```
+
+### Quality Assurance
+
+Hub maintains ecosystem integrity through:
+- **Automated testing**: All feature combinations validated
+- **Compatibility verification**: Cross-project testing before releases
+- **Performance monitoring**: Build time and binary size tracking
+- **Usage analytics**: Data-driven inclusion and optimization decisions
+
 ## Repository Management Commands
 
 Hub provides powerful commands for ecosystem-wide analysis and management:
@@ -36,6 +156,10 @@ Hub provides powerful commands for ecosystem-wide analysis and management:
 ./bin/repos.py outdated    # List packages with updates
 ./bin/repos.py search <pattern>  # Fuzzy package search
 ./bin/repos.py graph <package>   # Show dependency graph
+
+# 🔄 Dependency Update Commands
+./bin/repos.py update <repo> [--dry-run] [--force-commit] [--force]  # Update specific repository
+./bin/repos.py eco [--dry-run] [--force-commit] [--force]           # Update all repositories
 
 # 🔍 Advanced Analysis Commands
 ./bin/repos.py conflicts   # Version conflict analysis
@@ -61,6 +185,9 @@ Hub provides powerful commands for ecosystem-wide analysis and management:
 
 # Export raw repository and dependency data
 ./bin/repos.py export
+
+# Clean all target/ directories across ecosystem
+./bin/repos.py superclean
 ```
 
 ### Data Cache System & Performance Engine
@@ -89,6 +216,12 @@ Hub provides powerful commands for ecosystem-wide analysis and management:
 # Repository status and git operations (coming soon)
 ./bin/repos.py tap
 
+# Update dependencies in a specific repository
+./bin/repos.py update <repo-name> [--dry-run] [--force-commit] [--force]
+
+# Update dependencies across all repositories (ecosystem-wide)
+./bin/repos.py eco [--dry-run] [--force-commit] [--force]
+
 # Analyze specific package usage across all repositories
 ./bin/repos.py pkg <package-name>
 
@@ -98,6 +231,53 @@ Hub provides powerful commands for ecosystem-wide analysis and management:
 # Analyze hub dependency usage patterns
 ./bin/repos.py hub
 ```
+
+### Dependency Update Commands
+
+Hub provides powerful dependency update commands with safety checks and automation options:
+
+#### Update Commands
+- **`update <repo-name>`** - Update safe dependencies in a specific repository
+- **`eco`** - Update safe dependencies across all repositories (ecosystem-wide)
+
+#### Command Options
+- **`--dry-run`** - Show what would be updated without making changes
+- **`--force-commit`** - Automatically commit changes with "auto:hub bump" message
+- **`--force`** - Bypass git safety checks (use with caution)
+
+#### Git Safety Checks
+By default, update commands require:
+- Being on the main branch
+- Clean working directory (no uncommitted changes)
+
+The `--force` flag bypasses these safety checks, allowing you to:
+- Update dependencies when not on the main branch
+- Update dependencies with uncommitted changes in the working directory
+
+#### Usage Examples
+```bash
+# Safe update with dry-run first
+./bin/repos.py update meteor --dry-run
+./bin/repos.py update meteor
+
+# Update with automatic commit
+./bin/repos.py update boxy --force-commit
+
+# Force update bypassing safety checks (use carefully)
+./bin/repos.py update xstream --force
+
+# Ecosystem-wide update with all options
+./bin/repos.py eco --dry-run --force-commit --force
+
+# Safe ecosystem update
+./bin/repos.py eco
+```
+
+#### Safety Recommendations
+- Always run with `--dry-run` first to preview changes
+- Use `--force` only when you understand the implications
+- Consider committing existing changes before running updates
+- Test updated dependencies with `cargo check` and `cargo test`
 
 ### Data Export & Import
 ```bash
@@ -210,6 +390,20 @@ Hub intelligently handles git dependencies with LOCAL flag detection:
 ./bin/repos.py review       # Ecosystem dependency review
 ./bin/repos.py hub          # Hub-centric dashboard
 ./bin/repos.py pkg serde    # Detailed package analysis
+```
+
+### Update Commands
+```bash
+# Update dependencies in a specific repository
+./bin/repos.py update meteor --dry-run     # Preview changes first
+./bin/repos.py update meteor               # Apply safe updates
+./bin/repos.py update meteor --force-commit --force  # Force update with auto-commit
+
+# Ecosystem-wide dependency updates
+./bin/repos.py eco --dry-run              # Preview ecosystem changes
+./bin/repos.py eco                        # Apply safe updates across all repos
+./bin/repos.py eco --force-commit         # Apply updates with automatic commits
+./bin/repos.py eco --force                # Bypass git safety checks
 ```
 
 ### Basic Usage
@@ -342,17 +536,25 @@ cargo test --features "all"
 # 5. Hub integration status
 ./bin/repos.py hub
 
-# 6. Clean build artifacts across all repositories
+# 6. Update dependencies (preview first)
+./bin/repos.py eco --dry-run      # Preview ecosystem updates
+./bin/repos.py update meteor --dry-run  # Preview specific repo updates
+
+# 7. Apply dependency updates
+./bin/repos.py eco                # Safe ecosystem-wide updates
+./bin/repos.py update boxy --force-commit  # Update with auto-commit
+
+# 8. Clean build artifacts across all repositories
 ./bin/repos.py superclean
 
-# 7. Check specific packages
+# 9. Check specific packages
 ./bin/repos.py pkg serde
 
-# 8. Traditional analysis (when needed)
+# 10. Traditional analysis (when needed)
 ./bin/repos.py all                # Comprehensive analysis
 ./bin/repos.py latest regex       # Latest version check
 
-# 9. Check repository status (coming soon)
+# 11. Check repository status (coming soon)
 ./bin/repos.py tap
 ```
 
@@ -368,7 +570,10 @@ cargo test --features "all"
 1. Update versions in `Cargo.toml`
 2. Test all oodx projects for compatibility
 3. Run ecosystem analysis: `./bin/repos.py review`
-4. Update projects to new hub version
+4. Apply updates across ecosystem:
+   - Preview changes: `./bin/repos.py eco --dry-run`
+   - Apply safe updates: `./bin/repos.py eco`
+   - Or update specific repos: `./bin/repos.py update <repo-name>`
 5. Refresh data cache: `./bin/repos.py data`
 
 ## Architecture
@@ -400,8 +605,9 @@ Hub has evolved from a simple dependency analyzer to a comprehensive repository 
 - **Phase 5**: TSV cache system with 100x+ performance improvements
 - **Phase 6**: Enhanced UX with auto-detection and color-coded outputs
 - **Phase 7**: Comprehensive view commands with rich ecosystem analytics
-- **Phase 8**: Polish commands with integrated Boxy UI for beautiful terminal output (current)
-- **Phase 9**: Coming - `tap` command for git status/auto-commit across repos
+- **Phase 8**: Polish commands with integrated Boxy UI for beautiful terminal output
+- **Phase 9**: Enhanced dependency update commands with `--force` flag for bypassing git safety checks (current)
+- **Phase 10**: Coming - `tap` command for git status/auto-commit across repos
 
 ## Version Compatibility
 
@@ -413,8 +619,9 @@ Hub has evolved from a simple dependency analyzer to a comprehensive repository 
 - **v1.x**: Basic dependency analysis
 - **v2.x**: Export functionality and latest version checking
 - **v3.x**: Data caching, hydration, repository operations with progress bars
-- **v4.x**: Polish commands with TSV cache (100x+ performance) and Boxy UI (current)
-- **v5.x**: Planned - `tap` command and automated git operations
+- **v4.x**: Polish commands with TSV cache (100x+ performance) and Boxy UI
+- **v5.x**: Enhanced update commands with `--force` flag for git safety bypass (current)
+- **v6.x**: Planned - `tap` command and automated git operations
 
 ## Installation & Usage
 
@@ -465,11 +672,6 @@ export RUST_REPO_ROOT="/path/to/your/rust/projects"
 4. **Ecosystem impact** - Consider effects on all oodx projects
 5. **Data integrity** - Ensure TSV cache consistency
 
-## License
-
-AGPL-3.0 - Same as the oodx ecosystem
-
----
 
 ## Summary
 
@@ -486,6 +688,19 @@ Hub has evolved from a simple dependency management tool into a **comprehensive 
 
 The tool maintains its core mission of eliminating version conflicts while providing **instant insights** and comprehensive management capabilities for the entire oodx ecosystem through its revolutionary TSV cache system and beautiful Boxy UI integration.
 
----
+## License
 
-*One crate to rule them all, one crate to find them, one crate to bring them all, and in the ecosystem bind them.* 📦✨
+Snek/Snekfx, RSB Framework, Oxidex (ODX), and REBEL libraries, services, and software are offered under a **multi-license model**:
+
+| License | Who it’s for | Obligations |
+|---------|--------------|-------------|
+| [AGPL-3.0](./LICENSE) | Open-source projects that agree to release their own source code under the AGPL. | Must comply with the AGPL for any distribution or network service. |
+| [Community Edition License](./docs/LICENSE_COMMUNITY.txt) | Personal, educational, or academic use **only**. Not for companies, organizations, or anyone acting for the benefit of a business. | Must meet all CE eligibility requirements and follow its terms. |
+| [Commercial License](./docs/LICENSE_COMMERCIAL.txt) | Companies, contractors, or anyone needing to embed the software in closed-source, SaaS, or other commercial products. | Requires a signed commercial agreement with Dr. Vegajunk Hackware. |
+
+By **downloading, installing, linking to, or otherwise using RSB Framework, Oxidex, or REBEL**, you:
+
+1. **Accept** the terms of one of the licenses above, **and**  
+2. **Represent that you meet all eligibility requirements** for the license you have chosen.
+
+> Questions about eligibility or commercial licensing: **licensing@vegajunk.com**

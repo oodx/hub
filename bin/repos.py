@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """
-Rust dependency analyzer - Enhanced with commands for export, review, and package analysis
+Rust dependency analyzer - Enhanced with commands for export, review, package analysis, and dependency updates
 Commands:
   python repos.py                   # Default analysis view
   python repos.py export            # Export raw data to XDG data directory
   python repos.py review            # Detailed review with latest versions
   python repos.py pkg <package>     # Analyze specific package usage
   python repos.py latest <package>  # Check latest version from crates.io
+  python repos.py update <repo> [--dry-run] [--force-commit] [--force]  # Update dependencies in specific repository
+  python repos.py eco [--dry-run] [--force-commit] [--force]            # Update dependencies across all repositories
+
+Flags:
+  --dry-run        Show what would be updated without making changes
+  --force-commit   Automatically commit changes with "auto:hub bump" message
+  --force          Bypass git safety checks (main branch requirement and clean working directory)
 """
 
 import os
