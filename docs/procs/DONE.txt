@@ -6,8 +6,8 @@ CORRECTION: The strategy documents should NOT be removed - they are key architec
 STRATEGY DOCUMENTS TO UPDATE (High Priority):
 
 1. docs/VERSION_STRAT.md (STATUS: 85% current)
-   - Update tool references: ./bin/deps.py → ./bin/repos.py
-   - Add integration with current repos.py commands (conflicts, review, hub, pkg)
+   - Update tool references: ./bin/deps.py → ./bin/repos.py → blade
+   - Add integration with current blade commands (conflicts, review, hub, pkg)
    - Update semv integration examples
 
 2. docs/REFACTOR_STRAT.md (STATUS: 95% implemented - SUCCESS STORY!)

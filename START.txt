@@ -13,7 +13,7 @@ by providing a single source of truth for external dependencies.
 🎯 **Quick Start** (5 minutes to productive work):
 1. Read docs/procs/PROCESS.txt ← Master workflow guide (3 min read)
 2. Read docs/procs/ACHIEVEMENTS.md ← Strategic successes (1 min read)
-3. Run ./bin/repos.py fast --hub-dashboard ← Ecosystem status (1 min read)
+3. Run blade hub ← Ecosystem status (1 min read)
 4. Begin work with full context
 
 ⚡ **Ultra-Fast Start** (30 seconds):
@@ -30,7 +30,7 @@ by providing a single source of truth for external dependencies.
 - docs/VERSION_STRAT.md - Semantic versioning strategy
 
 🔧 **Essential Tools**:
-- ./bin/repos.py - Production dependency analysis (100x+ performance)
+- blade - Production dependency analysis (100x+ performance)
 - docs/misc/archive/ - Historical analysis and session data
 - bin/validate-docs.sh - Documentation integrity validation
 

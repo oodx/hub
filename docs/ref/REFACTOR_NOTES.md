@@ -4,17 +4,17 @@
 
 ### Major Refactor: Command Structure Simplification
 - **BEFORE**: Complex `fast` command with flags (`./bin/repos.py fast --conflicts`)
-- **AFTER**: Simple command names (`./bin/repos.py conflicts`)
+- **AFTER**: Simple command names (now migrated to `blade conflicts`)
 - All legacy view functions decommissioned
 - 100x+ performance maintained with TSV cache system
 
 ### Core Commands Now Available:
 ```bash
-./bin/repos.py conflicts    # Version conflict analysis
-./bin/repos.py query        # Package usage analysis
-./bin/repos.py review       # Dependency review
-./bin/repos.py hub          # Hub dashboard
-./bin/repos.py pkg <name>   # Package details
+blade conflicts    # Version conflict analysis
+blade query        # Package usage analysis
+blade review       # Dependency review
+blade hub          # Hub dashboard
+blade pkg <name>   # Package details
 ```
 
 ### Key Technical Fixes Applied:
@@ -33,13 +33,13 @@
 - Cache files added to .gitignore (deps_cache.tsv, deps_data.txt)
 
 ### Architecture Status:
-- repos.py: ~800+ lines, comprehensive ecosystem management tool
+- repos.py: ~800+ lines, comprehensive ecosystem management tool (migrated to blade)
 - All fast view commands working and tested
 - Legacy functions successfully decommissioned
 - Command dispatcher simplified and maintainable
 
 ## 🔧 TECHNICAL DEBT NOTES
-- repos.py has grown quite large - consider modularization if adding major features
+- repos.py has been migrated to blade tool for better ecosystem management
 - TSV cache system is solid but could benefit from schema versioning
 - Git dependency resolution works but could be optimized for large repos
 

@@ -6,8 +6,8 @@ Hub is a production-ready Rust ecosystem management tool that provides centraliz
 
 ## Core System Components
 
-### Primary Tool: `bin/repos.py`
-- **Size**: 173KB (~800 lines of production code)
+### Primary Tool: `blade` (migrated from `bin/repos.py`)
+- **Size**: Comprehensive repository management system
 - **Performance Engine**: TSV cache system delivering 100x+ speed improvements
 - **Command Portfolio**: 9 specialized commands (stats, conflicts, review, hub, etc.)
 - **Data Architecture**: 4-section TSV structure with relational ID mapping
@@ -193,7 +193,7 @@ hub/
 ├── META_PROCESS.txt            # Meta-process documentation
 ├── README.md                   # Project overview
 ├── bin/
-│   └── repos.py               # Primary analysis tool (173KB)
+│   └── repos.py               # Legacy analysis tool (migrated to blade)
 ├── src/
 │   └── lib.rs                 # Feature-gated re-exports
 ├── docs/

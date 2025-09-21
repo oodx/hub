@@ -5,22 +5,22 @@
 ### Branch: main
 ### Completed:
 - **Implemented ecosystem update commands with auto-commit functionality**:
-  - `./bin/repos.py update <repo> [--dry-run] [--force-commit]` - Update individual repository
-  - `./bin/repos.py eco [--dry-run] [--force-commit]` - Update all repositories (excludes hub/rsb)
+  - `blade update <repo> [--dry-run] [--force-commit]` - Update individual repository
+  - `blade eco [--dry-run] [--force-commit]` - Update all repositories (excludes hub/rsb)
   - `--force-commit` flag automatically commits changes with "auto:hub bump X dependencies" message
   - Git safety checks: main branch, clean working directory, no unpushed commits
   - SemVer-based breaking change detection prevents unsafe updates
   - Comprehensive error handling and status reporting
 - **Tested ecosystem update capabilities**: 5 repositories identified with safe dependency updates
 - **Previously implemented** `learn` command for hub dependency acquisition:
-  - Single package learning: `./bin/repos.py learn <package>`
-  - Batch learning: `./bin/repos.py learn all`
+  - Single package learning: `blade learn <package>`
+  - Batch learning: `blade learn all`
   - Smart domain categorization (text, data, time, web, system, dev, random)
   - Manual TOML editing fallback when toml library unavailable
   - Successfully learned 4 packages: unicode-width, criterion, thiserror, tempfile
 - **Previously implemented** `notes` command for hub metadata management:
-  - View metadata: `./bin/repos.py notes <repo>`
-  - Create metadata: `./bin/repos.py notes <repo> --create`
+  - View metadata: `blade notes <repo>`
+  - Create metadata: `blade notes <repo> --create`
   - Added [package.metadata.hub] section to boxy repository
 - Updated serde to version 1.0.226
 - Hub now has 16 current packages (increased from 12)
@@ -40,7 +40,7 @@
 ### Next Agent MUST:
 1. Read START.txt for orientation
 2. Review this CONTINUE.md for current state
-3. **Option A - Test ecosystem updates**: Run `./bin/repos.py eco --dry-run` to preview updates
+3. **Option A - Test ecosystem updates**: Run `blade eco --dry-run` to preview updates
 4. **Option B - Begin Meteor integration**:
    - Update Meteor's Cargo.toml to use hub
    - Replace direct dependencies with hub imports
@@ -58,7 +58,7 @@
 - Hub metadata enables per-repo configuration (hub_sync, priority, notes)
 
 ### Files Modified:
-- **bin/repos.py** - Added complete ecosystem update system:
+- **bin/repos.py** - Added complete ecosystem update system (now migrated to blade tool):
   - `update_repo_dependencies()` with force_commit support
   - `update_ecosystem()` with force_commit support
   - `auto_commit_changes()` function

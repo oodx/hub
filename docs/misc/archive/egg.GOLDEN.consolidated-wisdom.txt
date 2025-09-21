@@ -27,7 +27,7 @@ into actionable technical wisdom.
 
 ### 🎯 **Core System Components**
 
-**Primary Tool**: `bin/repos.py` (173KB, ~800 lines)
+**Primary Tool**: `blade` (migrated from `bin/repos.py`, 173KB, ~800 lines)
 - **Performance Engine**: TSV cache system (deps_cache.tsv) delivering 100x+ speed improvements
 - **Command Portfolio**: 9 specialized commands (stats, conflicts, review, hub, etc.)
 - **Data Architecture**: 4-section TSV structure with relational ID mapping
@@ -128,7 +128,7 @@ except: import toml (external package)
 
 **VERSION_STRAT.md**: ⚠️ **85% Current, Needs Tool Updates**
 - Core SemVer strategies remain accurate
-- Tool references need updating: `deps.py` → `repos.py`
+- Tool references updated: `deps.py` → `repos.py` → `blade`
 - Integration examples need current command syntax
 
 **HUB_STRAT.md**: 🔄 **60% Relevant, Architecture Evolved**
@@ -154,16 +154,16 @@ Advanced patterns already implemented:
 
 **Fast View Commands** (All Operational):
 ```bash
-./bin/repos.py fast --conflicts     # Version conflict analysis
-./bin/repos.py fast --pkg-detail    # Package deep-dive
-./bin/repos.py fast --hub-dashboard # Hub ecosystem status
+blade conflicts     # Version conflict analysis
+blade pkg           # Package deep-dive
+blade hub           # Hub ecosystem status
 ```
 
 **Data Management**:
 ```bash
-./bin/repos.py data                 # Generate TSV cache
-./bin/repos.py stats               # Ecosystem statistics
-./bin/repos.py review              # Dependency review
+blade data                 # Generate TSV cache
+blade stats               # Ecosystem statistics
+blade review              # Dependency review
 ```
 
 ### 🔍 **Critical Fixes Implemented**
@@ -194,7 +194,7 @@ Advanced patterns already implemented:
 ### ⚠️ **Identified Technical Debt**
 
 **Minor Cleanup Opportunities**:
-- Tool name consistency across documentation (`deps.py` → `repos.py`)
+- Tool name consistency across documentation (`deps.py` → `repos.py` → `blade`)
 - Session filename typo (`.session/SESSOIN_03.md`)
 - Strategy document freshness updates
 - Potential caching optimizations for large ecosystems
@@ -301,7 +301,7 @@ Document lifecycle management
 **Sources Analyzed**:
 - 10 comprehensive analysis eggs (technical, strategic, implementation)
 - 34 project documents across 5 categories
-- Primary tool codebase (`bin/repos.py`, 173KB)
+- Primary tool codebase (migrated to `blade` from `bin/repos.py`, 173KB)
 - Performance validation through command execution
 - Integration testing across multiple scenarios
 

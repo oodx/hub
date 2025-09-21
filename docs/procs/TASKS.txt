@@ -32,9 +32,9 @@
 
 ## Phase 5: Implementation Results ✅ COMPLETE
 - [x] 3 Fast view commands implemented and tested:
-  * `python bin/repos.py fast --conflicts` → 15 version conflicts analyzed instantly
-  * `python bin/repos.py fast --pkg-detail serde` → Complete package analysis in milliseconds
-  * `python bin/repos.py fast --hub-dashboard` → 72 packages analyzed with hub status
+  * `blade conflicts` → 15 version conflicts analyzed instantly
+  * `blade pkg serde` → Complete package analysis in milliseconds
+  * `blade hub` → 72 packages analyzed with hub status
 - [x] TSV hydration system working perfectly (162 deps, 18 repos)
 - [x] TOML compatibility fixed for Python 3.11+
 - [x] Data integrity issues resolved

@@ -33,7 +33,7 @@
 2. Read docs/procs/CONTINUE.md for complete project state (3 minutes)
 3. Review TASKS.txt for current implementation status (1 minute)
 4. Check docs/procs/QUICK_REF.txt for critical context updates
-5. Run ./bin/repos.py analyze for current ecosystem state
+5. Run blade analyze for current ecosystem state
 
 ## Step 2: Phase Detection
 **Current Phase**: Ready for Ecosystem Integration
@@ -47,20 +47,20 @@
 
 ### Development Session Pattern:
 1. **Context Load**: Read docs/procs/CONTINUE.md current status
-2. **Tool Analysis**: Run ./bin/repos.py [analyze|eco|hub] as needed
+2. **Tool Analysis**: Run blade [analyze|eco|hub] as needed
 3. **Implementation**: Work on current phase tasks from TASKS.txt
 4. **Validation**: Use .uat/ testing framework for quality assurance
 5. **Documentation**: Update session state in docs/procs/CONTINUE.md
 
 ### Integration Session Pattern:
-1. **Dependency Analysis**: ./bin/repos.py hub for integration opportunities
+1. **Dependency Analysis**: blade hub for integration opportunities
 2. **Consumer Project Setup**: Update target project Cargo.toml
 3. **Import Migration**: Replace direct deps with hub feature imports
 4. **Testing**: Validate functionality preservation
 5. **Documentation**: Record integration patterns and lessons
 
 ### Ecosystem Migration Pattern:
-1. **Gap Analysis**: ./bin/repos.py eco for ecosystem overview
+1. **Gap Analysis**: blade eco for ecosystem overview
 2. **Priority Planning**: Focus on high-usage dependencies first
 3. **Coordinated Updates**: Systematic project-by-project migration
 4. **Version Validation**: Ensure no conflicts across ecosystem
@@ -109,12 +109,12 @@
 cd /home/xnull/repos/code/rust/oodx/projects/hub/
 
 # Production dependency analysis tool (executable script)
-./bin/repos.py analyze     # Usage analysis (HIGH/MED/LOW priority)
-./bin/repos.py eco         # Ecosystem review with smart visual design
-./bin/repos.py hub         # Hub integration status & opportunities
-./bin/repos.py pkg serde   # Package-specific analysis across ecosystem
-./bin/repos.py latest      # Check latest versions from crates.io
-./bin/repos.py data        # Generate structured TSV cache
+blade analyze     # Usage analysis (HIGH/MED/LOW priority)
+blade eco         # Ecosystem review with smart visual design
+blade hub         # Hub integration status & opportunities
+blade pkg serde   # Package-specific analysis across ecosystem
+blade latest      # Check latest versions from crates.io
+blade data        # Generate structured TSV cache
 ```
 
 ## Integration Implementation Workflow
@@ -139,7 +139,7 @@ cat docs/procs/CONTINUE.md         # Full context load
 cat docs/procs/QUICK_REF.txt     # Critical updates
 
 # During work
-./bin/repos.py [command]         # Analysis as needed
+blade [command]         # Analysis as needed
 git status && git diff           # Track changes
 
 # Session end
@@ -166,7 +166,7 @@ git add . && git commit -m "..."  # Preserve work
 ## Workflow Rules & Conventions
 - **Session State**: Always update docs/procs/CONTINUE.md with handoff info
 - **Documentation**: Keep START.txt and QUICK_REF.txt current
-- **Analysis**: Use ./bin/repos.py for all dependency investigation
+- **Analysis**: Use blade for all dependency investigation
 - **Quality**: HORUS LEVEL2 standards for UAT certification
 - **Validation**: Run ./bin/validate-docs.sh before major changes
 
@@ -208,7 +208,7 @@ use hub::data::serde_json;
 ## Testing & Validation
 - .uat/v0.1.0/ - HORUS LEVEL2 certified testing framework
 - ./bin/validate-docs.sh - Documentation integrity validation
-- ./bin/repos.py - Production dependency analysis (100x+ performance)
+- blade - Production dependency analysis (100x+ performance)
 
 ================================================================================
 Last Updated: 2025-09-20 (Meta Process v2 Implementation)

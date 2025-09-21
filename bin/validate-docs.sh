@@ -99,7 +99,10 @@ check_tool_references() {
     if [[ -f "$file" ]]; then
         # Check for outdated tool references
         if grep -q "bin/deps\.py" "$file"; then
-            warn "Outdated tool reference in $file: bin/deps.py should be bin/repos.py"
+            warn "Outdated tool reference in $file: bin/deps.py should be blade"
+        fi
+        if grep -q "\./bin/repos\.py" "$file"; then
+            warn "Outdated tool reference in $file: ./bin/repos.py should be blade"
         fi
 
         if grep -q "analyze_deps\.sh" "$file"; then
@@ -148,7 +151,7 @@ check_dir "docs/misc/archive" "archived analysis and wisdom"
 echo "Checking tools and scripts..."
 
 check_dir "bin" "tools directory"
-check_file "bin/repos.py" "production dependency analysis tool"
+check_file "bin/repos.py" "legacy dependency analysis tool (migrated to blade)"
 check_file "bin/validate-docs.sh" "documentation validation script (this script)"
 
 # Quality assurance
@@ -198,9 +201,9 @@ fi
 # Check for common issues
 echo "Checking for common issues..."
 
-# Ensure bin/repos.py is executable
+# Note: bin/repos.py is legacy - blade tool should be used instead
 if [[ -f "bin/repos.py" ]] && [[ ! -x "bin/repos.py" ]]; then
-    warn "bin/repos.py is not executable - should be chmod +x"
+    info "bin/repos.py exists but not executable (legacy tool - use blade instead)"
 fi
 
 # Check for git repository

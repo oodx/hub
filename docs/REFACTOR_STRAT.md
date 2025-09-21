@@ -6,7 +6,7 @@
 - TSV cache system: ✅ WORKING (deps_cache.tsv)
 - Fast view rendering: ✅ ACHIEVED (100x+ performance)
 - Command structure: ✅ ENHANCED beyond original plan
-- Tool implementation: ✅ `bin/repos.py` (173KB, comprehensive ecosystem management)
+- Tool implementation: ✅ `blade` (migrated from `bin/repos.py`, 173KB, comprehensive ecosystem management)
 
 ## Overview
 
@@ -183,7 +183,7 @@ def get_display_columns(view_type: str) -> List[ColumnDef]:
 
 ## Files Structure
 
-- `bin/repos.py` - Main CLI with enhanced view commands and boxy integration
+- `blade` - Main CLI with enhanced view commands and boxy integration (migrated from `bin/repos.py`)
 - `REFACTOR_STRAT.md` - This strategy document
 - Generated: `deps_cache.tsv` - Structured data cache
 - Existing: `deps_data.txt` - Legacy export format (keep for compatibility)
@@ -191,7 +191,7 @@ def get_display_columns(view_type: str) -> List[ColumnDef]:
 ## ✅ IMPLEMENTATION RESULTS (September 2024)
 
 ### **Achieved Outcomes**
-- **File**: `bin/repos.py` (173KB, ~800 lines of comprehensive ecosystem management)
+- **File**: `blade` tool (migrated from `bin/repos.py`, 173KB, ~800 lines of comprehensive ecosystem management)
 - **Performance**: 100x+ improvement achieved via TSV cache system
 - **Commands**: Enhanced view commands beyond original plan:
   - `stats` - Ecosystem statistics with visual metrics

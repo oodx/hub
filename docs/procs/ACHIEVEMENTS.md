@@ -50,7 +50,7 @@ The Hub project represents a **complete strategic success** that exceeded all or
 - **Boxy Integration**: Visual enhancement with semantic color preservation
 - **Fast Command Suite**: 5 lightning-fast analysis commands
 - **Professional UX**: Rich formatting matching legacy command patterns
-- **Executable Design**: Direct `./bin/repos.py` execution without python prefix
+- **Executable Design**: Direct `blade` execution as external tool
 
 ### Data Intelligence
 - **Source Metadata Separation**: Clean version numbers with separate source tracking

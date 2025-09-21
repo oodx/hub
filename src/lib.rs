@@ -20,22 +20,31 @@
 //! use hub::serde;      // Instead of: use serde;
 //! ```
 //!
-//! ## Feature Groups
+//! ## External Feature Groups (Third-party - use if we have to)
 //!
-//! - **`text`** - Text processing: regex, lazy_static
-//! - **`data`** - Serialization: serde, serde_json, base64
-//! - **`time`** - Date/time: chrono, uuid
-//! - **`web`** - Web utilities: urlencoding
-//! - **`system`** - System access: libc, glob
-//! - **`random`** - Random generation: rand
-//! - **`dev`** - Development tools: portable-pty
+//! - **`text-ext`** - Text processing: regex, lazy_static, strip-ansi-escapes
+//! - **`data-ext`** - Serialization: serde, serde_json, base64, serde_yaml (deprecated)
+//! - **`time-ext`** - Date/time: chrono, uuid
+//! - **`web-ext`** - Web utilities: urlencoding
+//! - **`system-ext`** - System access: libc, glob
+//! - **`terminal-ext`** - Terminal tools: portable-pty
+//! - **`random-ext`** - Random generation: rand
+//! - **`async-ext`** - Asynchronous programming: tokio
+//! - **`cli-ext`** - Command line tools: clap, anyhow
+//! - **`error-ext`** - Error handling: anyhow, thiserror
+//! - **`test-ext`** - Testing utilities: criterion, tempfile
 //!
-//! ## Convenience Groups
+//! ## External Convenience Groups
 //!
-//! - **`common`** - Most commonly used: text + data
-//! - **`core`** - Essential features: text + data + time
-//! - **`extended`** - Comprehensive: core + web + system
-//! - **`all`** - Everything available
+//! - **`common-ext`** - Most commonly used external: text-ext + data-ext + error-ext
+//! - **`core-ext`** - Essential external: text-ext + data-ext + time-ext + error-ext
+//! - **`extended-ext`** - Comprehensive external: core-ext + web-ext + system-ext + cli-ext
+//! - **`dev-ext`** - Everything external (testing/dev use): ALL external packages
+//!
+//! ## Internal oodx/rsb Groups (Top-level namespace reserved)
+//!
+//! - **`core`** - Internal oodx/rsb core: colors
+//! - **`colors`** - Shared color system from jynx architecture
 //!
 //! ## Example
 //!
@@ -61,6 +70,10 @@
 // Core Re-exports - Feature Gated External Dependencies
 // ============================================================================
 
+/// Error handling utilities
+#[cfg(feature = "anyhow")]
+pub use anyhow;
+
 /// Base64 encoding/decoding utilities
 #[cfg(feature = "base64")]
 pub use base64;
@@ -68,6 +81,10 @@ pub use base64;
 /// Date and time handling
 #[cfg(feature = "chrono")]
 pub use chrono;
+
+/// Command line argument parsing
+#[cfg(feature = "clap")]
+pub use clap;
 
 /// File glob pattern matching
 #[cfg(feature = "glob")]
@@ -101,6 +118,28 @@ pub use serde;
 #[cfg(feature = "serde_json")]
 pub use serde_json;
 
+/// YAML serialization support
+///
+/// **⚠️ DEPRECATION WARNING ⚠️**
+///
+/// YAML support is deprecated and should be migrated to:
+/// - TOML (for configuration files)
+/// - JSON (for data exchange)
+/// - RON (for Rust-native serialization)
+///
+/// This feature will be removed in a future version.
+#[cfg(feature = "serde_yaml")]
+#[deprecated(since = "0.3.0", note = "YAML is deprecated. Use TOML, JSON, or RON instead.")]
+pub use serde_yaml;
+
+/// ANSI escape sequence removal utilities
+#[cfg(feature = "strip-ansi-escapes")]
+pub use strip_ansi_escapes;
+
+/// Asynchronous runtime
+#[cfg(feature = "tokio")]
+pub use tokio;
+
 /// URL encoding utilities
 #[cfg(feature = "urlencoding")]
 pub use urlencoding;
@@ -108,6 +147,22 @@ pub use urlencoding;
 /// UUID generation and parsing
 #[cfg(feature = "uuid")]
 pub use uuid;
+
+/// Unicode character width calculation
+#[cfg(feature = "unicode-width")]
+pub use unicode_width;
+
+/// Benchmarking framework
+#[cfg(feature = "criterion")]
+pub use criterion;
+
+/// Error type generation
+#[cfg(feature = "thiserror")]
+pub use thiserror;
+
+/// Temporary file creation
+#[cfg(feature = "tempfile")]
+pub use tempfile;
 
 // ============================================================================
 // Convenience Prelude Module
@@ -124,11 +179,17 @@ pub use uuid;
 /// let re = regex::Regex::new(r"\d+")?;
 /// ```
 pub mod prelude {
+    #[cfg(feature = "anyhow")]
+    pub use super::anyhow;
+
     #[cfg(feature = "base64")]
     pub use super::base64;
 
     #[cfg(feature = "chrono")]
     pub use super::chrono;
+
+    #[cfg(feature = "clap")]
+    pub use super::clap;
 
     #[cfg(feature = "glob")]
     pub use super::glob;
@@ -154,40 +215,80 @@ pub mod prelude {
     #[cfg(feature = "serde_json")]
     pub use super::serde_json;
 
+    #[cfg(feature = "serde_yaml")]
+    pub use super::serde_yaml;
+
+    #[cfg(feature = "strip-ansi-escapes")]
+    pub use super::strip_ansi_escapes;
+
+    #[cfg(feature = "tokio")]
+    pub use super::tokio;
+
     #[cfg(feature = "urlencoding")]
     pub use super::urlencoding;
 
     #[cfg(feature = "uuid")]
     pub use super::uuid;
+
+    #[cfg(feature = "unicode-width")]
+    pub use super::unicode_width;
+
+    #[cfg(feature = "criterion")]
+    pub use super::criterion;
+
+    #[cfg(feature = "thiserror")]
+    pub use super::thiserror;
+
+    #[cfg(feature = "tempfile")]
+    pub use super::tempfile;
 }
 
 // ============================================================================
-// Domain-Specific Collection Modules
+// Internal oodx/rsb Modules (Top-level namespace reserved for our own code)
 // ============================================================================
 
-/// Text processing utilities
-pub mod text {
+/// Shared color system from jynx architecture
+#[cfg(feature = "colors")]
+pub mod colors;
+
+// Future internal modules:
+// pub mod utils;
+// pub mod shared;
+// pub mod rsb;
+
+// ============================================================================
+// External Dependencies Collection Modules (Third-party - use if we have to)
+// ============================================================================
+
+/// Text processing utilities (external)
+pub mod text_ext {
     #[cfg(feature = "regex")]
     pub use super::regex;
 
     #[cfg(feature = "lazy_static")]
     pub use super::lazy_static;
+
+    #[cfg(feature = "strip-ansi-escapes")]
+    pub use super::strip_ansi_escapes;
 }
 
-/// Data serialization and encoding utilities
-pub mod data {
+/// Data serialization and encoding utilities (external)
+pub mod data_ext {
     #[cfg(feature = "serde")]
     pub use super::serde;
 
     #[cfg(feature = "serde_json")]
     pub use super::serde_json;
 
+    #[cfg(feature = "serde_yaml")]
+    pub use super::serde_yaml;
+
     #[cfg(feature = "base64")]
     pub use super::base64;
 }
 
-/// Date, time, and identification utilities
-pub mod time {
+/// Date, time, and identification utilities (external)
+pub mod time_ext {
     #[cfg(feature = "chrono")]
     pub use super::chrono;
 
@@ -195,14 +296,14 @@ pub mod time {
     pub use super::uuid;
 }
 
-/// Web and networking utilities
-pub mod web {
+/// Web and networking utilities (external)
+pub mod web_ext {
     #[cfg(feature = "urlencoding")]
     pub use super::urlencoding;
 }
 
-/// System and filesystem utilities
-pub mod system {
+/// System and filesystem utilities (external)
+pub mod system_ext {
     #[cfg(feature = "libc")]
     pub use super::libc;
 
@@ -210,16 +311,46 @@ pub mod system {
     pub use super::glob;
 }
 
-/// Random number generation utilities
-pub mod random {
+/// Terminal utilities (external)
+pub mod terminal_ext {
+    #[cfg(feature = "portable-pty")]
+    pub use super::portable_pty;
+}
+
+/// Random number generation utilities (external)
+pub mod random_ext {
     #[cfg(feature = "rand")]
     pub use super::rand;
 }
 
-/// Development and testing utilities
-pub mod dev {
-    #[cfg(feature = "portable-pty")]
-    pub use super::portable_pty;
+/// Asynchronous programming utilities (external)
+pub mod async_ext {
+    #[cfg(feature = "tokio")]
+    pub use super::tokio;
+}
+
+/// Command line interface utilities (external)
+pub mod cli_ext {
+    #[cfg(feature = "clap")]
+    pub use super::clap;
+
+    #[cfg(feature = "anyhow")]
+    pub use super::anyhow;
+}
+
+/// Error handling utilities (external)
+pub mod error_ext {
+    #[cfg(feature = "anyhow")]
+    pub use super::anyhow;
+}
+
+/// Testing utilities (external)
+pub mod test_ext {
+    #[cfg(feature = "criterion")]
+    pub use super::criterion;
+
+    #[cfg(feature = "tempfile")]
+    pub use super::tempfile;
 }
 
 // ============================================================================
@@ -235,11 +366,17 @@ pub fn version() -> &'static str {
 pub fn enabled_features() -> Vec<&'static str> {
     let mut features = Vec::new();
 
+    #[cfg(feature = "anyhow")]
+    features.push("anyhow");
+
     #[cfg(feature = "base64")]
     features.push("base64");
 
     #[cfg(feature = "chrono")]
     features.push("chrono");
+
+    #[cfg(feature = "clap")]
+    features.push("clap");
 
     #[cfg(feature = "glob")]
     features.push("glob");
@@ -265,11 +402,32 @@ pub fn enabled_features() -> Vec<&'static str> {
     #[cfg(feature = "serde_json")]
     features.push("serde_json");
 
+    #[cfg(feature = "serde_yaml")]
+    features.push("serde_yaml");
+
+    #[cfg(feature = "strip-ansi-escapes")]
+    features.push("strip-ansi-escapes");
+
+    #[cfg(feature = "tokio")]
+    features.push("tokio");
+
     #[cfg(feature = "urlencoding")]
     features.push("urlencoding");
 
     #[cfg(feature = "uuid")]
     features.push("uuid");
+
+    #[cfg(feature = "unicode-width")]
+    features.push("unicode-width");
+
+    #[cfg(feature = "criterion")]
+    features.push("criterion");
+
+    #[cfg(feature = "thiserror")]
+    features.push("thiserror");
+
+    #[cfg(feature = "tempfile")]
+    features.push("tempfile");
 
     features
 }

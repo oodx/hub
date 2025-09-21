@@ -14,7 +14,7 @@
 
 📋 **Current Tasks**:
 1. **COMPLETED**: Ecosystem update automation with --force-commit
-2. Test ecosystem updates: `./bin/repos.py eco --dry-run`
+2. Test ecosystem updates: `blade eco --dry-run`
 3. Update Meteor Cargo.toml with hub dependencies
 4. Migrate Meteor imports (use regex → use hub::regex)
 5. Validate Meteor functionality preservation
@@ -22,24 +22,24 @@
 
 🏗️ **Architecture**:
 - **Branch**: admin/meta-process (meta-process implementation)
-- **Tool**: ./bin/repos.py [analyze|eco|hub|update|learn|notes|pkg|latest|data]
+- **Tool**: blade [analyze|eco|hub|update|learn|notes|pkg|latest|data]
 - **Key Commands**:
   - cargo check && cargo test (validation)
-  - ./bin/repos.py hub (integration analysis)
-  - ./bin/repos.py eco --dry-run (preview ecosystem updates)
-  - ./bin/repos.py update <repo> --force-commit (auto-update with commit)
+  - blade hub (integration analysis)
+  - blade eco --dry-run (preview ecosystem updates)
+  - blade update <repo> --force-commit (auto-update with commit)
   - ./bin/validate-docs.sh (health check)
 
 ⚡ **Immediate Next Steps**:
 1. Read docs/procs/CONTINUE.md for complete session context
-2. Run ./bin/repos.py hub for integration opportunity analysis
-3. **Option A**: Test ecosystem updates with ./bin/repos.py eco --dry-run
+2. Run blade hub for integration opportunity analysis
+3. **Option A**: Test ecosystem updates with blade eco --dry-run
 4. **Option B**: Begin Meteor integration with Cargo.toml feature migration
 
 🚨 **Critical Rules**:
 - **Session Management**: Always update docs/procs/CONTINUE.md on work completion
 - **Quality Standards**: HORUS LEVEL2 UAT certification maintained
-- **Tool Usage**: Use ./bin/repos.py for all dependency analysis
+- **Tool Usage**: Use blade for all dependency analysis
 - **Documentation**: Keep START.txt and strategy docs current with changes
 
 💡 **Performance Note**: Tools achieve 100x+ improvement with TSV cache system
