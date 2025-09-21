@@ -342,6 +342,9 @@ pub mod cli_ext {
 pub mod error_ext {
     #[cfg(feature = "anyhow")]
     pub use super::anyhow;
+
+    #[cfg(feature = "thiserror")]
+    pub use super::thiserror;
 }
 
 /// Testing utilities (external)
