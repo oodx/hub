@@ -15,8 +15,12 @@ colors = []
 # Individual dependency features (external)
 anyhow = ["dep:anyhow"]
 base64 = ["dep:base64"]
-chrono = ["dep:chrono"]
-clap = ["dep:clap"]
+chrono = ["chrono-lite"]
+chrono-lite = ["dep:chrono", "chrono/clock", "chrono/std"]
+chrono-full = ["dep:chrono", "chrono/clock", "chrono/std", "chrono/serde"]
+clap = ["clap-lite"]
+clap-lite = ["dep:clap", "clap/std", "clap/help"]
+clap-full = ["dep:clap", "clap/std", "clap/help", "clap/derive", "clap/env", "clap/unicode"]
 glob = ["dep:glob"]
 lazy_static = ["dep:lazy_static"]
 libc = ["dep:libc"]
@@ -27,20 +31,22 @@ serde = ["dep:serde"]
 serde_json = ["dep:serde_json"]
 serde_yaml = ["dep:serde_yaml"]
 strip-ansi-escapes = ["dep:strip-ansi-escapes"]
-tokio = ["dep:tokio"]
+tokio = ["tokio-lite"]
+tokio-lite = ["dep:tokio", "tokio/rt", "tokio/macros"]
+tokio-full = ["dep:tokio", "tokio/full"]
 urlencoding = ["dep:urlencoding"]
 uuid = ["dep:uuid"]
 
 # Domain-based feature groups (external third-party packages - use if we have to)
 text-ext = ["regex", "lazy_static", "unicode-width", "strip-ansi-escapes"]
 data-ext = ["serde", "serde_json", "base64", "serde_yaml"]
-time-ext = ["chrono", "uuid"]
+time-ext = ["chrono-lite", "uuid"]
 web-ext = ["urlencoding"]
 system-ext = ["libc", "glob"]
 terminal-ext = ["portable-pty"]
 random-ext = ["rand"]
-async-ext = ["tokio"]
-cli-ext = ["clap", "anyhow"]
+async-ext = ["tokio-lite"]
+cli-ext = ["clap-lite", "anyhow"]
 error-ext = ["anyhow", "thiserror"]
 test-ext = ["criterion", "tempfile"]
 
@@ -104,8 +110,8 @@ tempfile = ["dep:tempfile"]
 # Core external dependencies - versions managed centrally
 anyhow = { version = "1.0", optional = true }
 base64 = { version = "0.22.1", optional = true }
-chrono = { version = "0.4.42", features = ["serde"], optional = true }
-clap = { version = "4.5", features = ["derive"], optional = true }
+chrono = { version = "0.4.42", optional = true, default-features = false }
+clap = { version = "4.5", optional = true, default-features = false }
 glob = { version = "0.3.3", optional = true }
 lazy_static = { version = "1.5.0", optional = true }
 libc = { version = "0.2.175", optional = true }
@@ -116,7 +122,7 @@ serde = { version = "1.0.226", features = ["derive"], optional = true }
 serde_json = { version = "1.0.145", optional = true }
 serde_yaml = { version = "0.9", optional = true }
 strip-ansi-escapes = { version = "0.2", optional = true }
-tokio = { version = "1.41", features = ["full"], optional = true }
+tokio = { version = "1.41", optional = true, default-features = false }
 urlencoding = { version = "2.1.3", optional = true }
 uuid = { version = "1.18.1", features = ["v4"], optional = true }
 unicode-width = { version = "0.2.1", optional = true }
