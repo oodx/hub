@@ -2960,10 +2960,20 @@ def update_repo_dependencies(ecosystem: EcosystemData, repo_name: str, dry_run: 
                 f.write(updated_content)
 
             print(f"{Colors.GREEN}✅ Applied {updates_applied} updates to Cargo.toml{Colors.END}")
-            print(f"\n{Colors.YELLOW}📋 Next steps:{Colors.END}")
-            print(f"  1. Test the updates: cd {repo_dir} && cargo check")
-            print(f"  2. Run tests: cargo test")
-            print(f"  3. Commit changes: git add Cargo.toml && git commit -m 'chore: update safe dependencies'")
+
+            # Auto-commit changes if force_commit is enabled
+            if force_commit:
+                print(f"{Colors.CYAN}🔧 Auto-committing changes...{Colors.END}")
+                success, commit_message = auto_commit_changes(str(repo_dir), updates_applied)
+                if success:
+                    print(f"{Colors.GREEN}✅ Auto-commit successful: {commit_message}{Colors.END}")
+                else:
+                    print(f"{Colors.RED}❌ Auto-commit failed: {commit_message}{Colors.END}")
+            else:
+                print(f"\n{Colors.YELLOW}📋 Next steps:{Colors.END}")
+                print(f"  1. Test the updates: cd {repo_dir} && cargo check")
+                print(f"  2. Run tests: cargo test")
+                print(f"  3. Commit changes: git add Cargo.toml && git commit -m 'chore: update safe dependencies'")
         else:
             print(f"{Colors.YELLOW}⚠️  No dependency patterns matched in Cargo.toml{Colors.END}")
 
@@ -3087,6 +3097,16 @@ def update_ecosystem(ecosystem: EcosystemData, dry_run: bool = False, force_comm
                     f.write(updated_content)
 
                 print(f"  {Colors.GREEN}✅ Applied {updates_applied} updates{Colors.END}")
+
+                # Auto-commit changes if force_commit is enabled
+                if force_commit:
+                    print(f"  {Colors.CYAN}🔧 Auto-committing changes...{Colors.END}")
+                    success, commit_message = auto_commit_changes(str(repo_dir), updates_applied)
+                    if success:
+                        print(f"  {Colors.GREEN}✅ Auto-commit successful{Colors.END}")
+                    else:
+                        print(f"  {Colors.RED}❌ Auto-commit failed: {commit_message}{Colors.END}")
+
                 updated_repos.append((repo.repo_name, updates_applied))
             else:
                 print(f"  {Colors.YELLOW}⚠️  No patterns matched in Cargo.toml{Colors.END}")
@@ -3125,10 +3145,16 @@ def update_ecosystem(ecosystem: EcosystemData, dry_run: bool = False, force_comm
 
     # Next steps
     if updated_repos and not dry_run:
-        print(f"\n{Colors.YELLOW}📋 Next steps:{Colors.END}")
-        print(f"  1. Test updates: Run cargo check in each updated repository")
-        print(f"  2. Run tests: cargo test in critical repositories")
-        print(f"  3. Commit changes: git add . && git commit -m 'chore: ecosystem dependency updates'")
+        if force_commit:
+            print(f"\n{Colors.YELLOW}📋 Next steps:{Colors.END}")
+            print(f"  1. Test updates: Run cargo check in each updated repository")
+            print(f"  2. Run tests: cargo test in critical repositories")
+            print(f"  {Colors.GRAY}(Changes have been automatically committed with 'auto:hub bump' messages){Colors.END}")
+        else:
+            print(f"\n{Colors.YELLOW}📋 Next steps:{Colors.END}")
+            print(f"  1. Test updates: Run cargo check in each updated repository")
+            print(f"  2. Run tests: cargo test in critical repositories")
+            print(f"  3. Commit changes: git add . && git commit -m 'chore: ecosystem dependency updates'")
 
 def view_review(ecosystem: EcosystemData) -> None:
     """Lightning-fast ecosystem dependency review using hydrated data

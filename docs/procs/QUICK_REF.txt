@@ -12,24 +12,29 @@
 - **MVP**: Centralized dependency management with feature-gated access
 - **Current Sprint**: Meteor as first consumer project integration
 
-📋 **Current Tasks** (see TASKS.txt):
-1. Update Meteor Cargo.toml with hub dependencies
-2. Migrate Meteor imports (use regex → use hub::regex)
-3. Validate Meteor functionality preservation
-4. Document integration patterns for RSB migration
+📋 **Current Tasks**:
+1. **COMPLETED**: Ecosystem update automation with --force-commit
+2. Test ecosystem updates: `./bin/repos.py eco --dry-run`
+3. Update Meteor Cargo.toml with hub dependencies
+4. Migrate Meteor imports (use regex → use hub::regex)
+5. Validate Meteor functionality preservation
+6. Document integration patterns for RSB migration
 
 🏗️ **Architecture**:
 - **Branch**: admin/meta-process (meta-process implementation)
-- **Tool**: ./bin/repos.py [analyze|eco|hub|pkg|latest|data]
+- **Tool**: ./bin/repos.py [analyze|eco|hub|update|learn|notes|pkg|latest|data]
 - **Key Commands**:
   - cargo check && cargo test (validation)
   - ./bin/repos.py hub (integration analysis)
+  - ./bin/repos.py eco --dry-run (preview ecosystem updates)
+  - ./bin/repos.py update <repo> --force-commit (auto-update with commit)
   - ./bin/validate-docs.sh (health check)
 
 ⚡ **Immediate Next Steps**:
 1. Read docs/procs/CONTINUE.md for complete session context
 2. Run ./bin/repos.py hub for integration opportunity analysis
-3. Begin Meteor integration with Cargo.toml feature migration
+3. **Option A**: Test ecosystem updates with ./bin/repos.py eco --dry-run
+4. **Option B**: Begin Meteor integration with Cargo.toml feature migration
 
 🚨 **Critical Rules**:
 - **Session Management**: Always update docs/procs/CONTINUE.md on work completion
