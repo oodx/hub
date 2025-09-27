@@ -85,13 +85,13 @@ pub use thiserror;
 #[cfg(feature = "base64")]
 pub use base64;
 
-/// Date and time handling
+/// Date and time handling with common re-exports
 #[cfg(feature = "chrono")]
-pub use chrono;
+pub mod chrono;
 
-/// Command line argument parsing
+/// Command line argument parsing with derive support
 #[cfg(feature = "clap")]
-pub use clap;
+pub mod clap;
 
 /// File glob pattern matching
 #[cfg(feature = "glob")]
@@ -113,9 +113,9 @@ pub use portable_pty;
 #[cfg(feature = "rand")]
 pub use rand;
 
-/// Regular expression processing
+/// Regular expression processing with common patterns
 #[cfg(feature = "regex")]
-pub use regex;
+pub mod regex;
 
 /// Serialization framework with optional derive support
 ///
@@ -145,9 +145,9 @@ pub use serde_yaml;
 #[cfg(feature = "strip-ansi-escapes")]
 pub use strip_ansi_escapes;
 
-/// Asynchronous runtime
+/// Asynchronous runtime with common utilities
 #[cfg(feature = "tokio")]
-pub use tokio;
+pub mod tokio;
 
 /// URL encoding utilities
 #[cfg(feature = "urlencoding")]
@@ -192,10 +192,10 @@ pub mod prelude {
     pub use super::base64;
 
     #[cfg(feature = "chrono")]
-    pub use super::chrono;
+    pub use crate::chrono;
 
     #[cfg(feature = "clap")]
-    pub use super::clap;
+    pub use crate::clap;
 
     #[cfg(feature = "glob")]
     pub use super::glob;
@@ -213,7 +213,7 @@ pub mod prelude {
     pub use super::rand;
 
     #[cfg(feature = "regex")]
-    pub use super::regex;
+    pub use crate::regex;
 
     #[cfg(feature = "serde")]
     pub use crate::serde;
@@ -228,7 +228,7 @@ pub mod prelude {
     pub use super::strip_ansi_escapes;
 
     #[cfg(feature = "tokio")]
-    pub use super::tokio;
+    pub use crate::tokio;
 
     #[cfg(feature = "urlencoding")]
     pub use super::urlencoding;
@@ -269,7 +269,7 @@ pub mod colors;
 /// Text processing utilities (external)
 pub mod text_ext {
     #[cfg(feature = "regex")]
-    pub use super::regex;
+    pub use crate::regex;
 
     #[cfg(feature = "lazy_static")]
     pub use super::lazy_static;
@@ -296,7 +296,7 @@ pub mod data_ext {
 /// Date, time, and identification utilities (external)
 pub mod time_ext {
     #[cfg(feature = "chrono")]
-    pub use super::chrono;
+    pub use crate::chrono;
 
     #[cfg(feature = "uuid")]
     pub use super::uuid;
@@ -332,13 +332,13 @@ pub mod random_ext {
 /// Asynchronous programming utilities (external)
 pub mod async_ext {
     #[cfg(feature = "tokio")]
-    pub use super::tokio;
+    pub use crate::tokio;
 }
 
 /// Command line interface utilities (external)
 pub mod cli_ext {
     #[cfg(feature = "clap")]
-    pub use super::clap;
+    pub use crate::clap;
 
     #[cfg(feature = "anyhow")]
     pub use super::anyhow;
