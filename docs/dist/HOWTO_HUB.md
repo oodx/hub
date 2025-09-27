@@ -330,6 +330,46 @@ Instead of simple passthrough re-exports (`pub use serde;`), shaped modules crea
 - Adds convenience type aliases and helpers
 - Combines related packages (like error handling)
 
+### Philosophy: Simple vs Shaped
+
+**Traditional re-exports** are simple (`pub use serde;`) but limited - no customization, no convenience items.
+
+**Shaped exports** provide a curated layer that:
+- ✅ Improves IDE autocomplete with explicit re-exports
+- ✅ Adds type aliases and helpers for common patterns
+- ✅ Gates optional features (derive macros, lite/full variants)
+- ✅ Documents hub-specific usage patterns
+- ✅ Still provides full crate access
+
+### When Hub Shapes a Module
+
+Not every dependency gets shaped. Hub uses these criteria:
+
+✅ **Good candidates:**
+- High usage (5+ projects in ecosystem)
+- Complex features (lite/full variants, derive macros)
+- Common patterns benefit from type aliases
+- Related packages work better combined (anyhow + thiserror)
+
+❌ **Remains simple re-export:**
+- Low usage (1-2 projects)
+- Simple passthrough with no features
+- No convenience patterns needed
+
+### Current Shaped Modules
+
+| Module | Usage | Why Shaped |
+|--------|-------|------------|
+| `serde` | 10 projects | High usage + derive feature gating |
+| `serde_json` | 7 projects | High usage + type aliases (Value, Map) |
+| `chrono` | 7 projects | Common types + convenience prelude |
+| `regex` | 5 projects | Common patterns + Result type alias |
+| `thiserror` | 5 projects | Part of combined error module |
+| `tokio` | 4 projects | Lite/full variants + common utilities |
+| `clap` | 4 projects | Lite/full variants + derive feature gating |
+| `error` | Combined | Merges anyhow + thiserror for unified error handling |
+| `colors` | Internal | Hub's own RSB color system |
+
 ### Available Shaped Modules
 
 #### `hub::serde` - Serialization Framework
@@ -551,7 +591,25 @@ features = ["json"]            # Full JSON stack
 - Simple passthrough with no features
 - No convenience needed
 
-For complete documentation on the shaping paradigm, see `docs/SHAPING_PARADIGM.md`.
+### Implementation Guidelines
+
+Shaped modules follow hub's standardized pattern:
+
+1. **Module file**: Create `src/package_name.rs` with full re-export (`pub use package::*;`)
+2. **Feature gates**: Use `#[cfg(feature = "...")]` for optional items
+3. **Type aliases**: Add common type aliases for cleaner code
+4. **Explicit re-exports**: Improve IDE support with commonly used items
+5. **Documentation**: Document features and common usage patterns
+
+### Learn More
+
+For complete documentation on the shaping paradigm, including:
+- Detailed philosophy and decision trees
+- Implementation patterns and guidelines
+- Real-world examples and testing strategies
+- Maintenance schedule and quality criteria
+
+See **[docs/SHAPING_PARADIGM.md](../SHAPING_PARADIGM.md)** - comprehensive guide to hub's shaped export system.
 
 ## Benefits
 
@@ -940,6 +998,8 @@ Hub embodies a **controlled integration** approach to dependency management with
 - **Lean by Default**: Lite variants provide fast builds and small binaries as the starting point
 - **Power When Needed**: Full variants available for advanced functionality without compromise
 - **Project Control**: Teams can compose exactly the feature set they need
+- **Shaped Exports**: High-usage dependencies get curated convenience layers with feature gating and type aliases
+- **Simple Passthrough**: Low-usage dependencies remain direct re-exports without overhead
 
 ### The Lite/Full Balance
 
@@ -950,4 +1010,14 @@ Hub's philosophy balances efficiency with capability:
 - **Compose Flexibly**: Mix lite and full variants based on actual project needs, not theoretical maximums
 - **Optimize Continuously**: Regular profiling of build times and binary sizes guides optimal feature selection
 
-Hub: *One crate to rule them all, one crate to find them, one crate to bring them all, and in the ecosystem bind them - but with clear separation between internal and external, and intelligent defaults that scale from lean to powerful.* 📦✨⚡
+### The Shaped Export Philosophy
+
+Hub shapes exports strategically based on usage and value:
+
+- **High-Value Shaping**: Packages with 5+ project usage get curated convenience layers
+- **Feature Gating**: Optional functionality (derive macros, lite/full variants) controlled at hub level
+- **Convenience Without Opinions**: Type aliases and explicit re-exports improve developer experience
+- **Combined Modules**: Related packages (anyhow + thiserror) unified when always used together
+- **Simple When Sufficient**: Low-usage dependencies remain direct re-exports without overhead
+
+Hub: *One crate to rule them all, one crate to find them, one crate to bring them all, and in the ecosystem bind them - but with clear separation between internal and external, intelligent defaults that scale from lean to powerful, and curated convenience layers where they matter most.* 📦✨⚡
