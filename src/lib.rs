@@ -70,9 +70,16 @@
 // Core Re-exports - Feature Gated External Dependencies
 // ============================================================================
 
-/// Error handling utilities
+/// Error handling utilities (anyhow + thiserror)
+#[cfg(feature = "error")]
+pub mod error;
+
+// Also provide direct access for backward compatibility
 #[cfg(feature = "anyhow")]
 pub use anyhow;
+
+#[cfg(feature = "thiserror")]
+pub use thiserror;
 
 /// Base64 encoding/decoding utilities
 #[cfg(feature = "base64")]
@@ -110,13 +117,15 @@ pub use rand;
 #[cfg(feature = "regex")]
 pub use regex;
 
-/// Serialization framework
+/// Serialization framework with optional derive support
+///
+/// Enable `serde-derive` for Serialize/Deserialize macros
 #[cfg(feature = "serde")]
-pub use serde;
+pub mod serde;
 
 /// JSON serialization support
-#[cfg(feature = "serde_json")]
-pub use serde_json;
+#[cfg(feature = "serde-json")]
+pub mod serde_json;
 
 /// YAML serialization support
 ///
@@ -156,9 +165,6 @@ pub use unicode_width;
 #[cfg(feature = "criterion")]
 pub use criterion;
 
-/// Error type generation
-#[cfg(feature = "thiserror")]
-pub use thiserror;
 
 /// Temporary file creation
 #[cfg(feature = "tempfile")]
@@ -210,10 +216,10 @@ pub mod prelude {
     pub use super::regex;
 
     #[cfg(feature = "serde")]
-    pub use super::serde;
+    pub use crate::serde;
 
-    #[cfg(feature = "serde_json")]
-    pub use super::serde_json;
+    #[cfg(feature = "serde-json")]
+    pub use crate::serde_json;
 
     #[cfg(feature = "serde_yaml")]
     pub use super::serde_yaml;
@@ -275,10 +281,10 @@ pub mod text_ext {
 /// Data serialization and encoding utilities (external)
 pub mod data_ext {
     #[cfg(feature = "serde")]
-    pub use super::serde;
+    pub use crate::serde;
 
-    #[cfg(feature = "serde_json")]
-    pub use super::serde_json;
+    #[cfg(feature = "serde-json")]
+    pub use crate::serde_json;
 
     #[cfg(feature = "serde_yaml")]
     pub use super::serde_yaml;
@@ -340,6 +346,10 @@ pub mod cli_ext {
 
 /// Error handling utilities (external)
 pub mod error_ext {
+    #[cfg(feature = "error")]
+    pub use crate::error;
+
+    // Direct access for backward compatibility
     #[cfg(feature = "anyhow")]
     pub use super::anyhow;
 
@@ -402,8 +412,8 @@ pub fn enabled_features() -> Vec<&'static str> {
     #[cfg(feature = "serde")]
     features.push("serde");
 
-    #[cfg(feature = "serde_json")]
-    features.push("serde_json");
+    #[cfg(feature = "serde-json")]
+    features.push("serde-json");
 
     #[cfg(feature = "serde_yaml")]
     features.push("serde_yaml");

@@ -17,6 +17,7 @@ target
 # Hub repository management cache files
 deps_cache.tsv
 deps_data.txt
+.cargo-deps-checksum
 
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can

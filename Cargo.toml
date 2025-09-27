@@ -1,6 +1,6 @@
 [package]
 name = "hub"
-version = "0.3.0"
+version = "0.3.1"
 description = "Central hub for oodx/RSB ecosystem - dependency management and global utilities"
 license = "AGPL-3.0"
 repository = "https://github.com/oodx/hub"
@@ -28,7 +28,9 @@ portable-pty = ["dep:portable-pty"]
 rand = ["dep:rand"]
 regex = ["dep:regex"]
 serde = ["dep:serde"]
-serde_json = ["dep:serde_json"]
+serde-derive = ["serde", "serde/derive"]
+serde-json = ["serde", "dep:serde_json"]
+json = ["serde-derive", "serde-json"]
 serde_yaml = ["dep:serde_yaml"]
 strip-ansi-escapes = ["dep:strip-ansi-escapes"]
 tokio = ["tokio-lite"]
@@ -39,7 +41,7 @@ uuid = ["dep:uuid"]
 
 # Domain-based feature groups (external third-party packages - use if we have to)
 text-ext = ["regex", "lazy_static", "unicode-width", "strip-ansi-escapes"]
-data-ext = ["serde", "serde_json", "base64", "serde_yaml"]
+data-ext = ["serde-derive", "serde-json", "base64", "serde_yaml"]
 time-ext = ["chrono-lite", "uuid"]
 web-ext = ["urlencoding"]
 system-ext = ["libc", "glob"]
@@ -47,6 +49,7 @@ terminal-ext = ["portable-pty"]
 random-ext = ["rand"]
 async-ext = ["tokio-lite"]
 cli-ext = ["clap-lite", "anyhow"]
+error = ["error-ext"]
 error-ext = ["anyhow", "thiserror"]
 test-ext = ["criterion", "tempfile"]
 
@@ -73,7 +76,7 @@ deps-libc = ["libc"]
 deps-rand = ["rand"]
 deps-regex = ["regex"]
 deps-serde = ["serde"]
-deps-serde_json = ["serde_json"]
+deps-serde_json = ["serde-json"]
 deps-serde_yaml = ["serde_yaml"]
 deps-strip-ansi-escapes = ["strip-ansi-escapes"]
 deps-tokio = ["tokio"]
@@ -101,7 +104,6 @@ deps-all = [
 
 # Convenience alias for the full set (RSB compatibility)
 deps = ["deps-all"]
-
 unicode-width = ["dep:unicode-width"]
 criterion = ["dep:criterion"]
 thiserror = ["dep:thiserror"]
@@ -118,7 +120,7 @@ libc = { version = "0.2.175", optional = true }
 portable-pty = { version = "0.9", optional = true }
 rand = { version = "0.9.2", optional = true }
 regex = { version = "1.11.2", optional = true }
-serde = { version = "1.0.226", features = ["derive"], optional = true }
+serde = { version = "1.0.226", optional = true, default-features = false }
 serde_json = { version = "1.0.145", optional = true }
 serde_yaml = { version = "0.9", optional = true }
 strip-ansi-escapes = { version = "0.2", optional = true }
