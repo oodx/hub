@@ -534,43 +534,61 @@ The `-ext` suffix clearly communicates: "These are external third-party packages
 
 Hub provides **shaped export modules** for high-usage dependencies that benefit from curated APIs, feature-gated access, or convenience enhancements. These modules provide more than simple passthrough re-exports.
 
-#### Available Shaped Modules
+#### Available Shaped Modules (7 total)
 
-**`hub::serde`** - Serialization Framework with Feature Gating
-```toml
-features = ["serde"]           # Base traits only
-features = ["serde-derive"]    # With Serialize/Deserialize macros
-features = ["json"]            # Full JSON stack (serde-derive + serde-json)
-```
+**Data & Serialization:**
+- **`hub::serde`** - Feature-gated derive macros (`serde`, `serde-derive`, `serde-full`)
+- **`hub::serde_json`** - Type aliases (`Map<K,V>`, `Value`) + explicit re-exports
 
-**`hub::serde_json`** - JSON with Convenience Aliases
+**Error Handling:**
+- **`hub::error`** - Combined anyhow + thiserror with `Result<T>` and `Error` aliases
+
+**Date/Time & Text:**
+- **`hub::chrono`** - Common types (`DateTime`, `Utc`, `Duration`) + convenience prelude
+- **`hub::regex`** - Common patterns (`Regex`, `Captures`) + `Result<T>` alias
+
+**Async & CLI:**
+- **`hub::tokio`** - Lite/full variants with common utilities (`main`, `spawn`)
+- **`hub::clap`** - Lite/full variants, feature-gated derive macros
+
+#### Quick Examples
+
 ```rust
-use hub::serde_json::{Value, Map};  // Type aliases for cleaner code
-use hub::serde_json::{from_str, to_string};  // Explicit re-exports
-```
+// Serialization with feature gating
+use hub::serde::{Serialize, Deserialize};
+use hub::serde_json::{Value, Map};
 
-**`hub::error`** - Combined Error Handling (anyhow + thiserror)
-```rust
+// Unified error handling
 use hub::error::{Result, anyhow, thiserror};
 
-#[derive(thiserror::Error, Debug)]
-enum MyError {
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-}
+// Date/time with prelude
+use hub::chrono::{DateTime, Utc};
+use hub::chrono::prelude::*;
 
-fn example() -> Result<()> {  // anyhow::Result
-    anyhow::bail!("something went wrong");
-}
+// Regex with Result alias
+use hub::regex::{Regex, Captures};
+
+// Async with lite variant
+use hub::tokio;
+#[tokio::main]
+async fn main() { /* ... */ }
+
+// CLI with builder or derive
+use hub::clap::{Command, Arg};  // Lite
+use hub::clap::Parser;  // Full (requires clap-full)
 ```
 
 #### Why Shaped Exports?
 
-- **Feature Gating**: Granular control over optional functionality (derive macros, etc.)
-- **Convenience Aliases**: Type shortcuts like `Map<K, V>` for cleaner code
+- **Feature Gating**: Granular control over optional functionality (derive macros, full feature sets)
+- **Lite/Full Variants**: Performance-optimized defaults with opt-in full features (tokio, clap, chrono)
+- **Convenience Aliases**: Type shortcuts like `Map<K, V>`, `Result<T>` for cleaner code
 - **IDE Support**: Explicit re-exports improve autocomplete and discoverability
-- **Combined Modules**: Merge related crates (anyhow + thiserror for errors)
+- **Combined Modules**: Merge related crates (anyhow + thiserror for unified error handling)
+- **Convenience Preludes**: Quick imports for complex packages (chrono::prelude)
 - **Hub-Specific Patterns**: Add conveniences without modifying upstream crates
+
+**Coverage**: 7 shaped modules covering all high-usage dependencies (5+ projects in ecosystem)
 
 For complete details on shaped exports and feature forwarding, see `docs/SHAPING_PARADIGM.md` and `docs/dist/HOWTO_HUB.md`.
 

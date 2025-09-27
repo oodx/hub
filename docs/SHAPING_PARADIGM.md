@@ -69,18 +69,23 @@ Not every dependency needs shaping. Use this decision tree:
 
 | Module | Usage | Why Shaped |
 |--------|-------|------------|
-| `serde` | 11 projects | High usage + derive feature gating |
-| `serde_json` | 8 projects | High usage + type aliases (Value, Map) |
-| `error` | Combined | Merges anyhow (5) + thiserror (6) |
+| `serde` | 10 projects | High usage + derive feature gating |
+| `serde_json` | 7 projects | High usage + type aliases (Value, Map) |
+| `chrono` | 7 projects | Common types + convenience prelude |
+| `regex` | 5 projects | Common patterns + Result type alias |
+| `thiserror` | 5 projects | Part of combined error module |
+| `tokio` | 4 projects | Lite/full variants + common utilities |
+| `clap` | 4 projects | Lite/full variants + derive feature gating |
+| `error` | Combined | Merges anyhow + thiserror for unified error handling |
 | `colors` | Internal | Hub's own RSB color system |
 
 ### Not Yet Shaped (Future Candidates)
 
 | Module | Usage | Consider When |
 |--------|-------|---------------|
-| `chrono` | 7 projects | Already has lite/full, could add convenience |
-| `regex` | 6 projects | Could add common patterns |
-| `tokio` | 5 projects | Already has lite/full, could add prelude |
+| `unicode-width` | 5 projects | Could add convenience patterns if common usage emerges |
+| `criterion` | 5 projects | Testing framework - may benefit from benchmark prelude |
+| `tempfile` | 5 projects | Simple utility - likely remains direct re-export |
 
 ## Implementation Pattern
 
@@ -219,6 +224,146 @@ use hub::error::{Result, anyhow, thiserror};
 use hub::anyhow;
 use hub::thiserror;
 type Result<T> = anyhow::Result<T>;
+```
+
+### Example 4: chrono (Common Re-exports + Prelude)
+
+**Problem**: Date/time types require verbose imports, prelude is nested.
+
+**Solution**: Shaped module with explicit common types and convenience prelude.
+
+```rust
+// src/chrono.rs
+pub use chrono::*;
+
+// Common types (explicit for better IDE support)
+pub use chrono::{DateTime, Utc, Local, Duration, NaiveDateTime, NaiveDate, NaiveTime};
+pub use chrono::TimeZone;
+
+// Prelude module for convenient imports
+pub mod prelude {
+    pub use chrono::prelude::*;
+}
+```
+
+**Usage:**
+```rust
+use hub::chrono::{DateTime, Utc, Duration};  // Direct common types
+use hub::chrono::prelude::*;  // Or use prelude for everything
+
+let now: DateTime<Utc> = Utc::now();
+```
+
+### Example 5: regex (Common Patterns + Type Alias)
+
+**Problem**: Common regex types require explicit imports, error handling verbose.
+
+**Solution**: Shaped module with common patterns and Result alias.
+
+```rust
+// src/regex.rs
+pub use regex::*;
+
+// Common types (explicit for better IDE support)
+pub use regex::{Regex, RegexBuilder, Captures, Match, Replacer};
+pub use regex::{RegexSet, RegexSetBuilder};
+
+// Result type alias
+pub type Result<T> = std::result::Result<T, regex::Error>;
+```
+
+**Usage:**
+```rust
+use hub::regex::{Regex, Captures};
+use hub::regex::Result;  // Instead of Result<T, regex::Error>
+
+fn parse(input: &str) -> Result<Vec<String>> {
+    let re = Regex::new(r"\d+")?;
+    Ok(re.find_iter(input).map(|m| m.as_str().to_string()).collect())
+}
+```
+
+### Example 6: tokio (Lite/Full Variants)
+
+**Problem**: Projects need different tokio feature sets, full variant is heavy.
+
+**Solution**: Shaped module with common utilities and feature-gated full items.
+
+```rust
+// src/tokio.rs
+pub use tokio::*;
+
+// Common runtime items (always available)
+pub use tokio::{main, test, spawn};
+
+// Full variant items (requires tokio-full feature)
+#[cfg(feature = "tokio-full")]
+pub use tokio::{join, select, time};
+```
+
+**Usage:**
+```toml
+# Lite variant (basic async runtime)
+features = ["tokio-lite"]  # or use tokio directly
+
+# Full variant (networking, filesystem, etc.)
+features = ["tokio-full"]
+```
+
+```rust
+use hub::tokio;
+
+#[tokio::main]  // Works with lite
+async fn main() {
+    tokio::spawn(async { /* ... */ });  // Works with lite
+
+    // Requires tokio-full:
+    // tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
+}
+```
+
+### Example 7: clap (Lite/Full with Derive Gating)
+
+**Problem**: Derive macros add compile time, not all projects need them.
+
+**Solution**: Shaped module with builders (lite) and feature-gated derive (full).
+
+```rust
+// src/clap.rs
+pub use clap::*;
+
+// Common types (always available)
+pub use clap::{Arg, ArgMatches, Command, ArgAction, builder};
+
+// Derive macros (requires clap-full feature)
+#[cfg(feature = "clap-full")]
+pub use clap::{Parser, Args, Subcommand, ValueEnum};
+```
+
+**Usage:**
+```toml
+# Lite variant (builder API only)
+features = ["clap-lite"]  # or use clap directly
+
+# Full variant (derive macros)
+features = ["clap-full"]
+```
+
+```rust
+// Lite: Builder API
+use hub::clap::{Command, Arg};
+
+let app = Command::new("myapp")
+    .arg(Arg::new("input").short('i'));
+
+// Full: Derive API (requires clap-full)
+use hub::clap::Parser;
+
+#[derive(Parser)]
+struct Cli {
+    #[arg(short, long)]
+    input: String,
+}
 ```
 
 ## Guidelines
@@ -379,39 +524,41 @@ Shaped modules should:
 
 ### Potential Additions
 
-**chrono shaping:**
-```rust
-// src/chrono.rs
-pub use chrono::*;
+Hub has successfully shaped all high-usage packages (5+ projects). Future candidates include:
 
-// Common re-exports
-pub use chrono::{DateTime, Utc, Local, Duration, TimeZone};
+**unicode-width shaping:**
+- If common usage patterns emerge
+- Could provide width calculation utilities
+- Currently low complexity suggests simple re-export is sufficient
 
-// Convenience prelude
-pub mod prelude {
-    pub use chrono::prelude::*;
-}
-```
+**criterion shaping:**
+- Testing framework used in 5+ projects
+- Could benefit from benchmark prelude module
+- May add convenience macros for common patterns
 
-**regex shaping:**
-```rust
-// src/regex.rs
-pub use regex::*;
-
-// Common re-exports
-pub use regex::{Regex, RegexBuilder, Captures, Match};
-
-// Type alias
-pub type Result<T> = Result<T, regex::Error>;
-```
+**Medium-usage packages (3-4 projects):**
+- Monitor usage patterns as ecosystem grows
+- Consider shaping when usage reaches 5+ projects
+- Examples: uuid (4), rand (4), libc (3)
 
 ### Philosophy Evolution
 
+Hub's shaped exports have matured to cover all major use cases:
+
+**Current State (v0.3+):**
+- ✅ 7 shaped modules covering high-usage dependencies
+- ✅ Feature gating for derive macros and optional functionality
+- ✅ Lite/full variants for performance-critical packages
+- ✅ Type aliases and convenience re-exports
+- ✅ Combined modules for related functionality
+
+**Future Evolution:**
 As hub matures, shaped exports may:
-- Provide more convenience preludes
-- Add hub-specific helper functions
-- Combine related crates (like error module)
-- **But always**: Stay close to upstream, maintain compatibility
+- Provide more convenience preludes for complex packages
+- Add hub-specific helper functions (carefully, staying close to upstream)
+- Combine more related crates when usage patterns justify it
+- Introduce hub-specific abstractions for common patterns
+- **But always**: Stay close to upstream, maintain compatibility, avoid opinionated wrappers
 
 ## See Also
 

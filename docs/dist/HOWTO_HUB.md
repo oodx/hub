@@ -400,6 +400,93 @@ type Error = hub::error::Error;          // anyhow::Error
 
 **Why Shaped**: Combines anyhow (flexible errors) and thiserror (derive macros) since they're always used together.
 
+#### `hub::chrono` - Date/Time Handling
+```toml
+features = ["chrono"]           # Base date/time (lite variant)
+features = ["chrono-full"]      # With serialization support
+```
+
+```rust
+// Common types with explicit re-exports
+use hub::chrono::{DateTime, Utc, Local, Duration, NaiveDateTime};
+
+let now: DateTime<Utc> = Utc::now();
+let duration = Duration::hours(2);
+
+// Or use the prelude for everything
+use hub::chrono::prelude::*;
+```
+
+**Why Shaped**: Provides explicit common types for better IDE support and convenience prelude module.
+
+#### `hub::regex` - Regular Expressions
+```toml
+features = ["regex"]            # Pattern matching
+```
+
+```rust
+// Common types and Result alias
+use hub::regex::{Regex, RegexBuilder, Captures};
+use hub::regex::Result;  // Instead of Result<T, regex::Error>
+
+fn parse(input: &str) -> Result<Vec<String>> {
+    let re = Regex::new(r"\d+")?;
+    Ok(re.find_iter(input).map(|m| m.as_str().to_string()).collect())
+}
+```
+
+**Why Shaped**: Provides common pattern types and Result alias for cleaner error handling.
+
+#### `hub::tokio` - Async Runtime
+```toml
+features = ["tokio"]            # Basic async runtime (lite variant)
+features = ["tokio-lite"]       # Explicit lite: rt, macros
+features = ["tokio-full"]       # Full: networking, filesystem, etc.
+```
+
+```rust
+// Common utilities (lite)
+use hub::tokio;
+
+#[tokio::main]
+async fn main() {
+    tokio::spawn(async { /* ... */ }).await;
+}
+
+// Full variant includes networking, filesystem, etc.
+// Requires tokio-full feature:
+// use hub::tokio::net::TcpListener;
+// use hub::tokio::fs;
+```
+
+**Why Shaped**: Provides lite/full variants for performance control with common runtime utilities.
+
+#### `hub::clap` - CLI Argument Parsing
+```toml
+features = ["clap"]             # Builder API (lite variant)
+features = ["clap-lite"]        # Explicit lite: builder API only
+features = ["clap-full"]        # Full: derive macros, env support
+```
+
+```rust
+// Lite: Builder API
+use hub::clap::{Command, Arg};
+
+let app = Command::new("myapp")
+    .arg(Arg::new("input").short('i'));
+
+// Full: Derive API (requires clap-full)
+use hub::clap::Parser;
+
+#[derive(Parser)]
+struct Cli {
+    #[arg(short, long)]
+    input: String,
+}
+```
+
+**Why Shaped**: Provides lite/full variants to avoid heavy derive compilation when not needed.
+
 ### Shaped vs Simple Re-exports
 
 | Feature | Simple Re-export | Shaped Export |
@@ -419,11 +506,19 @@ Shaped modules work like any other hub export:
 use hub::serde::{Serialize, Deserialize};
 use hub::serde_json::{Value, Map};
 use hub::error::{Result, anyhow};
+use hub::chrono::{DateTime, Utc};
+use hub::regex::{Regex, Captures};
+use hub::tokio;
+use hub::clap::{Command, Arg};
 
 // Domain module access
 use hub::data_ext::serde;
 use hub::data_ext::serde_json;
 use hub::error_ext::error;
+use hub::time_ext::chrono;
+use hub::text_ext::regex;
+use hub::async_ext::tokio;
+use hub::cli_ext::clap;
 ```
 
 ### Feature Forwarding Pattern
