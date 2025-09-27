@@ -530,6 +530,50 @@ features = ["regex", "serde", "chrono", "uuid"]  # Individual external packages
 ### Philosophy Behind the -ext Suffix
 The `-ext` suffix clearly communicates: "These are external third-party packages that we use because we have to, but we prefer our own internal solutions when available."
 
+### Shaped Export Modules
+
+Hub provides **shaped export modules** for high-usage dependencies that benefit from curated APIs, feature-gated access, or convenience enhancements. These modules provide more than simple passthrough re-exports.
+
+#### Available Shaped Modules
+
+**`hub::serde`** - Serialization Framework with Feature Gating
+```toml
+features = ["serde"]           # Base traits only
+features = ["serde-derive"]    # With Serialize/Deserialize macros
+features = ["json"]            # Full JSON stack (serde-derive + serde-json)
+```
+
+**`hub::serde_json`** - JSON with Convenience Aliases
+```rust
+use hub::serde_json::{Value, Map};  // Type aliases for cleaner code
+use hub::serde_json::{from_str, to_string};  // Explicit re-exports
+```
+
+**`hub::error`** - Combined Error Handling (anyhow + thiserror)
+```rust
+use hub::error::{Result, anyhow, thiserror};
+
+#[derive(thiserror::Error, Debug)]
+enum MyError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+}
+
+fn example() -> Result<()> {  // anyhow::Result
+    anyhow::bail!("something went wrong");
+}
+```
+
+#### Why Shaped Exports?
+
+- **Feature Gating**: Granular control over optional functionality (derive macros, etc.)
+- **Convenience Aliases**: Type shortcuts like `Map<K, V>` for cleaner code
+- **IDE Support**: Explicit re-exports improve autocomplete and discoverability
+- **Combined Modules**: Merge related crates (anyhow + thiserror for errors)
+- **Hub-Specific Patterns**: Add conveniences without modifying upstream crates
+
+For complete details on shaped exports and feature forwarding, see `docs/SHAPING_PARADIGM.md` and `docs/dist/HOWTO_HUB.md`.
+
 ## Data Cache & Hydration System - Performance Engine
 
 Hub uses a sophisticated TSV-based caching system that powers the lightning-fast commands, delivering **100x+ performance improvements** over traditional analysis:

@@ -317,6 +317,147 @@ features = ["tokio-full", "clap-full"]
 # Perfect for: production services needing full feature sets
 ```
 
+## Shaped Export Modules
+
+Hub provides **shaped export modules** for high-usage dependencies that need feature-gated access or convenience enhancements. These are dedicated source files that curate how packages are exported.
+
+### What Are Shaped Exports?
+
+Instead of simple passthrough re-exports (`pub use serde;`), shaped modules create a dedicated file like `src/serde.rs` that:
+- Re-exports the entire crate with `pub use crate::*`
+- Explicitly re-exports key items for better IDE support
+- Provides feature-gated access to optional functionality
+- Adds convenience type aliases and helpers
+- Combines related packages (like error handling)
+
+### Available Shaped Modules
+
+#### `hub::serde` - Serialization Framework
+```toml
+# Cargo.toml - Feature options
+features = ["serde"]           # Base traits only
+features = ["serde-derive"]    # With Serialize/Deserialize macros
+features = ["serde-full"]      # All serde features
+```
+
+```rust
+// Usage with derive macros
+use hub::serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize)]
+struct Config {
+    name: String,
+}
+```
+
+**Why Shaped**: Projects need granular control over derive macros without forcing them on everyone.
+
+#### `hub::serde_json` - JSON Serialization
+```toml
+features = ["serde-json"]      # JSON support
+features = ["json"]            # Convenience: serde-derive + serde-json
+```
+
+```rust
+// Convenience type aliases
+use hub::serde_json::{Value, Map};
+
+let mut data: Map = Map::new();
+data.insert("key".to_string(), Value::String("value".to_string()));
+
+// Explicit re-exports for IDE support
+use hub::serde_json::{from_str, to_string, from_value, to_value};
+```
+
+**Why Shaped**: Provides type aliases like `Map<K=String, V=Value>` for cleaner code and better IDE autocomplete.
+
+#### `hub::error` - Combined Error Handling
+```toml
+features = ["error"]           # Base error module
+features = ["anyhow"]          # Flexible error handling
+features = ["thiserror"]       # Error derive macros
+features = ["error-ext"]       # Convenience: anyhow + thiserror
+```
+
+```rust
+// Unified error handling with both anyhow and thiserror
+use hub::error::{Result, anyhow, thiserror};
+
+#[derive(thiserror::Error, Debug)]
+enum MyError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+}
+
+fn example() -> Result<()> {
+    anyhow::bail!("something went wrong");
+}
+
+// Convenience type aliases
+type Result<T> = hub::error::Result<T>;  // anyhow::Result
+type Error = hub::error::Error;          // anyhow::Error
+```
+
+**Why Shaped**: Combines anyhow (flexible errors) and thiserror (derive macros) since they're always used together.
+
+### Shaped vs Simple Re-exports
+
+| Feature | Simple Re-export | Shaped Export |
+|---------|------------------|---------------|
+| Implementation | `pub use serde;` | Dedicated `src/serde.rs` file |
+| Feature gating | No granular control | Feature-specific items |
+| Type aliases | Not possible | Convenience aliases provided |
+| IDE support | Basic | Enhanced with explicit re-exports |
+| Customization | None | Can add hub-specific helpers |
+
+### Using Shaped Modules
+
+Shaped modules work like any other hub export:
+
+```rust
+// Top-level access
+use hub::serde::{Serialize, Deserialize};
+use hub::serde_json::{Value, Map};
+use hub::error::{Result, anyhow};
+
+// Domain module access
+use hub::data_ext::serde;
+use hub::data_ext::serde_json;
+use hub::error_ext::error;
+```
+
+### Feature Forwarding Pattern
+
+Shaped modules use **feature forwarding** where hub features map to underlying crate features:
+
+```toml
+# Hub feature flags forward to crate features
+serde = ["dep:serde"]
+serde-derive = ["serde", "serde/derive"]
+serde-json = ["serde", "dep:serde_json"]
+json = ["serde-derive", "serde-json"]
+
+# Gives you granular control
+features = ["serde"]           # Just traits
+features = ["serde-derive"]    # Traits + macros
+features = ["json"]            # Full JSON stack
+```
+
+### When to Use Shaped Modules
+
+✅ **Use shaped modules for:**
+- High-usage dependencies (5+ projects)
+- Packages with complex feature sets
+- Common patterns that benefit from type aliases
+- Combined functionality (error handling)
+
+❌ **Simple re-exports for:**
+- Low-usage dependencies (1-2 projects)
+- Simple passthrough with no features
+- No convenience needed
+
+For complete documentation on the shaping paradigm, see `docs/SHAPING_PARADIGM.md`.
+
 ## Benefits
 
 ### For Your Project
